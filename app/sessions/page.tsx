@@ -7,15 +7,61 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { sessions } from "@/lib/mock-data"
 import { Calendar, Clock, MapPin, Video, Plus, CheckCircle2, XCircle, Copy, AlertCircle, Check } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ScheduleSessionDialog } from "@/components/schedule-session-dialog"
+import { useAuth } from "@/contexts/auth-context"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 export default function SessionsPage() {
+  const { user } = useAuth()
   const [showSchedule, setShowSchedule] = useState(false)
   const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null)
+  const [mentorLink, setMentorLink] = useState("")
+  const [selectedSkill, setSelectedSkill] = useState("")
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
+  const [mentorSessions, setMentorSessions] = useState<Array<{ mentor: string; skill: string; link: string }>>([])
 
   const upcomingSessions = sessions.filter((s) => s.status === "scheduled")
   const completedSessions = sessions.filter((s) => s.status === "completed")
+
+  const eligibleSkills = useMemo(() => {
+    if (!user?.skillsTeach) return []
+    return user.skillsTeach.filter((s) => s.testResult?.passed && (s.testResult?.score || 0) >= 75)
+  }, [user?.skillsTeach])
+
+  useEffect(() => {
+    const stored = localStorage.getItem("mentorSessions")
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored)
+        setMentorSessions(Array.isArray(parsed) ? parsed : [])
+      } catch {
+        setMentorSessions([])
+      }
+    }
+  }, [])
+
+  const saveMentorSession = () => {
+    setSaveError(null)
+    setSaveSuccess(null)
+    if (!selectedSkill) {
+      setSaveError("Choose a skill")
+      return
+    }
+    if (!mentorLink.startsWith("https://meet.google.com/")) {
+      setSaveError("Meeting link must start with https://meet.google.com/")
+      return
+    }
+    const mentorName = user?.name || "Mentor"
+    const existing = mentorSessions.filter((m) => !(m.mentor === mentorName && m.skill === selectedSkill))
+    const updated = [...existing, { mentor: mentorName, skill: selectedSkill, link: mentorLink }]
+    setMentorSessions(updated)
+    localStorage.setItem("mentorSessions", JSON.stringify(updated))
+    setSaveSuccess("Meeting link saved")
+    setMentorLink("")
+  }
 
   return (
     <div className="p-8">
@@ -34,6 +80,46 @@ export default function SessionsPage() {
             Schedule Session
           </Button>
         </div>
+
+        {/* Mentor session setup (minimal UI) */}
+        {eligibleSkills.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Mentor Session</CardTitle>
+              <CardDescription>Share a Google Meet link for a skill you can teach</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-3 items-end">
+              <div className="space-y-2">
+                <Label>Select Skill</Label>
+                <select
+                  className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+                  value={selectedSkill}
+                  onChange={(e) => setSelectedSkill(e.target.value)}
+                >
+                  <option value="">Choose a skill</option>
+                  {eligibleSkills.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Google Meet Link</Label>
+                <Input
+                  placeholder="https://meet.google.com/xxx-yyyy-zzz"
+                  value={mentorLink}
+                  onChange={(e) => setMentorLink(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={saveMentorSession}>Save Mentor Link</Button>
+                {saveSuccess && <span className="text-sm text-green-600">{saveSuccess}</span>}
+                {saveError && <span className="text-sm text-red-600">{saveError}</span>}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-3">
@@ -91,6 +177,33 @@ export default function SessionsPage() {
           </TabsList>
 
           <TabsContent value="upcoming" className="mt-6 space-y-4">
+            {/* Learner view: mentor sessions list */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Available Mentor Sessions</CardTitle>
+                <CardDescription>Join Google Meet sessions shared by mentors</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {mentorSessions.length === 0 && <p className="text-sm text-muted-foreground">Session not scheduled yet</p>}
+                {mentorSessions.map((m, idx) => (
+                  <div key={`${m.mentor}-${m.skill}-${idx}`} className="flex items-center justify-between border rounded-md p-3">
+                    <div>
+                      <p className="font-semibold">{m.skill}</p>
+                      <p className="text-sm text-muted-foreground">Mentor: {m.mentor}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="default"
+                        onClick={() => window.open(m.link, "_blank")}
+                      >
+                        Join Meet
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
             {upcomingSessions.length === 0 ? (
               <Card>
                 <CardContent className="p-12 text-center">
@@ -132,7 +245,7 @@ export default function SessionsPage() {
                           </Badge>
                         </div>
                         <CardDescription>
-                          with {session.mentor === "Alex Chen" ? session.mentee : session.mentor}
+                          with {session.mentor === "Rufiya" ? session.mentee : session.mentor}
                         </CardDescription>
                       </div>
                       <Badge variant="outline" className="bg-accent/10 text-accent border-accent/20">
@@ -261,7 +374,7 @@ export default function SessionsPage() {
                         <div>
                           <h3 className="font-semibold mb-1">{session.skill}</h3>
                           <p className="text-sm text-muted-foreground mb-2">
-                            with {session.mentor === "Alex Chen" ? session.mentee : session.mentor}
+                            with {session.mentor === "Rufiya" ? session.mentee : session.mentor}
                           </p>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground">
                             <span>{new Date(session.date).toLocaleDateString()}</span>

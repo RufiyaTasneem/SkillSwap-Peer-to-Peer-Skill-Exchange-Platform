@@ -121,7 +121,7 @@ export default function LoginPage() {
                   <Label htmlFor="name">Full Name</Label>
                   <Input
                     id="name"
-                    placeholder="Alex Chen"
+                    placeholder="Rufiya"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required={!isLogin}
@@ -133,7 +133,7 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="alex@university.edu"
+                  placeholder="rufiya@university.edu"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required

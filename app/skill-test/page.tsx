@@ -109,55 +109,53 @@ export default function SkillTestPage() {
   const [showReview, setShowReview] = useState(false)
   const [testResultId, setTestResultId] = useState<string | null>(null)
   const [loadingQuestions, setLoadingQuestions] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Get pending skill from sessionStorage and fetch questions from API
+    // Get pending skill from sessionStorage (if user came from dashboard)
+    // and fetch questions from API or use local fallback
     const loadQuestions = async () => {
-      const stored = sessionStorage.getItem("pendingSkill")
+    const stored = sessionStorage.getItem("pendingSkill")
 
-      // If user opened this page directly or refreshed, there will be no pending skill
-      if (!stored) {
-        alert("No skill test found. Please add a skill from the dashboard first.")
-        router.push("/dashboard")
-        return
+      let category = "Default"
+      let skillLabel = skillName
+
+    if (stored) {
+        try {
+      const skill = JSON.parse(stored)
+      setPendingSkill(skill)
+          category = skill.category || "Default"
+          skillLabel = skill.skillName || skillName
+        } catch {
+          // If stored data is invalid, just fall back to default questions
+          sessionStorage.removeItem("pendingSkill")
+        }
       }
 
+      setLoadingQuestions(true)
       try {
-        const skill = JSON.parse(stored)
-        setPendingSkill(skill)
-        
-        // Fetch questions from API
-        setLoadingQuestions(true)
-        try {
-          const response = await questionsAPI.getQuestionsByCategory(skill.category)
-          if (response.success && response.data) {
-            setQuestions(response.data)
-            setAnswers(new Array(response.data.length).fill(-1))
-          } else {
-            // Fallback to local questions if API fails
-            const qs = getQuestionsForSkill(skill.skillName, skill.category)
-            setQuestions(qs)
-            setAnswers(new Array(qs.length).fill(-1))
-          }
-        } catch (error) {
-          console.error("Error loading questions:", error)
-          // Fallback to local questions
-          const qs = getQuestionsForSkill(skill.skillName, skill.category)
-          setQuestions(qs)
-          setAnswers(new Array(qs.length).fill(-1))
-        } finally {
-          setLoadingQuestions(false)
-        }
-      } catch (error) {
-        // Invalid JSON or corrupted data – clean up and send user back
-        sessionStorage.removeItem("pendingSkill")
-        alert("There was a problem loading your skill test. Please add the skill again from the dashboard.")
-        router.push("/dashboard")
+        // Try backend questions first (by category, if available)
+        const response = await questionsAPI.getQuestionsByCategory(category)
+        if (response.success && response.data) {
+          setQuestions(response.data)
+          setAnswers(new Array(response.data.length).fill(-1))
+        } else {
+          const qs = getQuestionsForSkill(skillLabel, category)
+      setQuestions(qs)
+      setAnswers(new Array(qs.length).fill(-1))
+    }
+      } catch {
+        // Pure client-side fallback
+        const qs = getQuestionsForSkill(skillLabel, category)
+        setQuestions(qs)
+        setAnswers(new Array(qs.length).fill(-1))
+      } finally {
+        setLoadingQuestions(false)
       }
     }
     
     loadQuestions()
-  }, [router])
+  }, [router, skillName])
 
   const handleAnswerSelect = (value: string) => {
     const newAnswers = [...answers]
@@ -178,68 +176,47 @@ export default function SkillTestPage() {
   }
 
   const handleSubmit = async () => {
-    if (!pendingSkill || !pendingSkill.skillId) {
-      // If this happens, the user is on the test page without a skill selected
-      alert("No pending skill found. Please add a skill to teach from the dashboard, then take the test.")
-      router.push("/dashboard")
+    setSubmitError(null)
+
+    if (questions.length === 0 || answers.length !== questions.length) {
+      setSubmitError("Please answer all questions before submitting.")
       return
     }
 
     setIsSubmitting(true)
     
-    try {
-      // Submit test to backend API
-      const response = await testsAPI.submitTest({
-        skillId: pendingSkill.skillId,
-        answers: answers,
-        category: pendingSkill.category,
-      })
-
-      if (response.success && response.data) {
-        const result = response.data
-        setScore(result.score)
-        setTestResultId(result.id)
-        
-        // Store test result locally as well
-        const testResult = {
-          skillName: pendingSkill.skillName,
-          skillLevel: pendingSkill.skillLevel,
-          category: pendingSkill.category,
-          score: result.score,
-          passed: result.passed,
-          date: result.testDate,
-        }
-        localStorage.setItem(`skillTest_${pendingSkill.skillName}`, JSON.stringify(testResult))
-        
-        // Pass threshold is 70%
-        if (result.passed) {
-          // Show loading state briefly, then show review form
-          setTimeout(() => {
-            setIsSubmitting(false)
-            setShowReview(true)
-          }, 1500)
-        } else {
-          setIsSubmitting(false)
-        }
-      } else {
-        throw new Error(response.message || "Failed to submit test")
+    // Pure client-side score calculation
+    let correct = 0
+    questions.forEach((q, idx) => {
+      if (answers[idx] === q.correct) correct++
+    })
+    
+    const percentage = Math.round((correct / questions.length) * 100)
+    setScore(percentage)
+    setIsSubmitting(false)
+    
+    // New pass threshold: 75%
+    if (percentage >= 75) {
+      // Mark skill as eligible to teach and save in user profile (client-side JSON via auth context)
+      const newSkill: Skill = {
+        id: pendingSkill?.skillId || `skill_${Date.now()}`,
+        name: pendingSkill?.skillName || skillName,
+        level: (pendingSkill?.skillLevel as "Beginner" | "Intermediate" | "Advanced" | "Expert") || "Beginner",
+        category: pendingSkill?.category || "Other",
+        testResult: {
+        score: percentage,
+        passed: true,
+        date: new Date().toISOString(),
+        },
       }
-    } catch (error: any) {
-      console.error("Error submitting test:", error)
-      // Fallback to local calculation
-      let correct = 0
-      questions.forEach((q, idx) => {
-        if (answers[idx] === q.correct) correct++
-      })
-      const percentage = Math.round((correct / questions.length) * 100)
-      setScore(percentage)
-      setIsSubmitting(false)
       
-      if (percentage >= 70) {
-        setTimeout(() => {
-          setShowReview(true)
-        }, 1500)
-      }
+      addSkillToTeach(newSkill)
+      sessionStorage.removeItem("pendingSkill")
+      alert("You are eligible to teach this skill")
+      router.push("/dashboard")
+    } else {
+      // Below threshold: do not allow teaching, stay on page
+      setSubmitError("You should pass this test to teach the skill")
     }
   }
 
@@ -260,16 +237,16 @@ export default function SkillTestPage() {
       }
 
       // Store review locally as well
-      const review = {
-        skillName: pendingSkill.skillName,
-        rating: testRating,
-        review: testReview,
-        date: new Date().toISOString(),
-      }
-      
-      const reviews = JSON.parse(localStorage.getItem("skillTestReviews") || "[]")
-      reviews.push(review)
-      localStorage.setItem("skillTestReviews", JSON.stringify(reviews))
+    const review = {
+      skillName: pendingSkill.skillName,
+      rating: testRating,
+      review: testReview,
+      date: new Date().toISOString(),
+    }
+    
+    const reviews = JSON.parse(localStorage.getItem("skillTestReviews") || "[]")
+    reviews.push(review)
+    localStorage.setItem("skillTestReviews", JSON.stringify(reviews))
       
       // Also update the test result with rating and review
       const testResultKey = `skillTest_${pendingSkill.skillName}`
@@ -299,9 +276,9 @@ export default function SkillTestPage() {
       
       // Clean up session storage
       sessionStorage.removeItem("pendingSkill")
-      
-      // Redirect to dashboard
-      router.push("/dashboard")
+    
+    // Redirect to dashboard
+    router.push("/dashboard")
     } catch (error) {
       console.error("Error submitting feedback:", error)
       // Still redirect even if feedback submission fails
@@ -312,7 +289,7 @@ export default function SkillTestPage() {
 
   const progress = ((currentQuestion + 1) / questions.length) * 100
   const canSubmit = answers.every(a => a !== -1) && !isSubmitting
-  const passed = score !== null && score >= 70
+  const passed = score !== null && score >= 75
 
   if (loadingQuestions || questions.length === 0) {
     return (
@@ -412,7 +389,7 @@ export default function SkillTestPage() {
                   rows={4}
                 />
               </div>
-
+              
               <div className="bg-accent/10 rounded-lg p-3 text-sm">
                 <p className="font-medium text-accent mb-1">Thank you for your feedback!</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
@@ -447,8 +424,8 @@ export default function SkillTestPage() {
                   Skip
                 </Button>
                 <Button onClick={handleReviewSubmit} disabled={testRating === 0}>
-                  Submit Review & Continue
-                </Button>
+                Submit Review & Continue
+              </Button>
               </div>
             </CardContent>
           </Card>

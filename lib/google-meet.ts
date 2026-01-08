@@ -4,11 +4,11 @@
 
 /**
  * Generates a random Google Meet code (3-letter groups separated by dashes)
- * Format: abc-defg-hij (11 characters total)
+ * Format: xxx-yyyy-zzz (3-4-3 characters, 11 characters total)
  */
 function generateMeetCode(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz'
-  const groups = [3, 4, 4] // Standard Google Meet code format
+  const groups = [3, 4, 3] // Standard Google Meet code format: xxx-yyyy-zzz
   
   return groups
     .map((length) => {

@@ -82,8 +82,8 @@ export interface Post {
 // Current logged-in user
 export const currentUser: User = {
   id: "1",
-  name: "Alex Chen",
-  email: "alex.chen@university.edu",
+  name: "Rufiya",
+  email: "rufiya@university.edu",
   avatar: "/student-avatar.png",
   credits: 250,
   badges: [
@@ -263,7 +263,7 @@ export const sessions: Session[] = [
     time: "14:00",
     meetingLink: "https://meet.example.com/ml-basics",
     mentor: "Sarah Johnson",
-    mentee: "Alex Chen",
+    mentee: "Rufiya",
     status: "scheduled",
   },
   {
@@ -273,7 +273,7 @@ export const sessions: Session[] = [
     date: "2024-12-18",
     time: "16:30",
     location: "Campus Library, Room 204",
-    mentor: "Alex Chen",
+    mentor: "Rufiya",
     mentee: "John Doe",
     status: "scheduled",
   },
