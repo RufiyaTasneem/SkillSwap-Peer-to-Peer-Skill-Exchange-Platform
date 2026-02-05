@@ -9,6 +9,8 @@ import dotenv from 'dotenv';
 import skillRoutes from './routes/skillRoutes.js';
 import questionRoutes from './routes/questionRoutes.js';
 import testRoutes from './routes/testRoutes.js';
+import skillTestRoutes from './routes/skillTestRoutes.js';
+import matchingRoutes from './routes/matchingRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import './config/database.js'; // Initialize database
 
@@ -46,6 +48,8 @@ app.get('/health', (req, res) => {
 app.use('/api/skills', skillRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/tests', testRoutes);
+app.use('/api', skillTestRoutes);
+app.use('/api/matches', matchingRoutes);
 
 // Error handling
 app.use(notFoundHandler);

@@ -4,18 +4,49 @@
  */
 
 import db from '../config/database.js';
+import { generateQuestionsForSkill, isAIConfigured } from './aiQuestionService.js';
 
 /**
- * Get questions by category
- * @param {string} category - Question category
+ * Get questions by category/skill
+ * @param {string} category - Question category or skill name
  * @returns {Array} Array of question objects
  */
-export function getQuestionsByCategory(category) {
+export async function getQuestionsByCategory(category) {
+  // First try to get predefined questions from database
   let questions = db.find('questions', q => q.category === category);
 
-  // If no questions found for category, use Default category
-  if (questions.length === 0 && category !== 'Default') {
-    questions = db.find('questions', q => q.category === 'Default');
+  // If no questions found for specific category, try AI generation
+  if (questions.length === 0) {
+    try {
+      console.log(`No predefined questions found for ${category}, generating with AI...`);
+      const aiQuestions = await generateQuestionsForSkill(category, 10);
+
+      // Convert AI format to database format
+      questions = aiQuestions.map((q, index) => {
+        // Prefer legacy `correct` (number) if present, otherwise use `correctAnswerIndex` from AI normalization
+        const correctIndex = typeof q.correct === 'number'
+          ? q.correct
+          : (typeof q.correctAnswerIndex === 'number' ? q.correctAnswerIndex : undefined);
+
+        if (typeof correctIndex !== 'number') {
+          console.error(`AI question missing correct index for category ${category}: ${q.question}`);
+        }
+
+        return {
+          id: `ai_${category}_${index}`,
+          category: category,
+          question: q.question,
+          options: q.options,
+          correct_answer: typeof correctIndex === 'number' ? correctIndex : 0
+        };
+      });
+
+      console.log(`Generated ${questions.length} questions for ${category}`);
+    } catch (error) {
+      console.error('Failed to generate AI questions:', error);
+      // Fall back to Default category
+      questions = db.find('questions', q => q.category === 'Default');
+    }
   }
 
   // Shuffle questions for randomness

@@ -2,7 +2,7 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import type { Match } from "@/lib/mock-data"
+import type { MatchResult } from "@/lib/matching-service"
 import { Star, Calendar, Video, Copy, Check } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { generateGoogleMeetLink } from "@/lib/google-meet"
@@ -11,12 +11,13 @@ import { useState } from "react"
 interface RequestSessionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  match: Match | null
+  match: MatchResult | null
 }
 
 export function RequestSessionDialog({ open, onOpenChange, match }: RequestSessionDialogProps) {
   const router = useRouter()
-  const [meetLink] = useState(() => generateGoogleMeetLink(match?.skill))
+  const primarySkill = match?.skills[0]?.skillName || "Skill"
+  const [meetLink] = useState(() => generateGoogleMeetLink(primarySkill))
   const [copied, setCopied] = useState(false)
 
   if (!match) return null
@@ -31,8 +32,10 @@ export function RequestSessionDialog({ open, onOpenChange, match }: RequestSessi
     // Store the meeting link for the session
     if (typeof window !== "undefined") {
       const sessionData = {
-        skill: match.skill,
+        skill: primarySkill,
+        skills: match.skills.map(s => s.skillName),
         mentor: match.mentor.name,
+        mentorId: match.mentor.id,
         meetingLink: meetLink,
         timestamp: new Date().toISOString(),
       }
@@ -62,13 +65,20 @@ export function RequestSessionDialog({ open, onOpenChange, match }: RequestSessi
             />
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold truncate">{match.mentor.name}</h3>
-              <p className="text-sm text-muted-foreground truncate">{match.skill}</p>
-              <div className="flex items-center gap-2 mt-1">
+              <p className="text-sm text-muted-foreground truncate">
+                {match.skills.length === 1
+                  ? match.skills[0].skillName
+                  : `${match.skills.length} matching skills`}
+              </p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <div className="flex items-center gap-1 text-sm">
                   <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                  <span className="font-medium">{match.mentor.rating}</span>
+                  <span className="font-medium">{match.mentor.rating.toFixed(1)}</span>
                 </div>
                 <span className="text-xs text-muted-foreground">{match.matchScore}% compatibility</span>
+                {match.isMutual && (
+                  <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded">Mutual Match</span>
+                )}
               </div>
             </div>
           </div>

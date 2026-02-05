@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { allSkills } from "@/lib/mock-data"
+import { allSkills, type Skill } from "@/lib/mock-data"
 import { useRouter } from "next/navigation"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 import { skillsAPI } from "@/lib/api"
+import { useAuth } from "@/contexts/auth-context"
 
 interface AddSkillDialogProps {
   open: boolean
@@ -27,6 +28,18 @@ export function AddSkillDialog({ open, onOpenChange, type }: AddSkillDialogProps
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string>("")
   const router = useRouter()
+  const { addSkillToTeach, addSkillToLearn } = useAuth()
+
+  // Reset form when dialog closes
+  const handleDialogChange = (open: boolean) => {
+    if (!open) {
+      setSkillName("")
+      setSkillLevel("")
+      setCategory("")
+      setError("")
+    }
+    onOpenChange(open)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,48 +48,63 @@ export function AddSkillDialog({ open, onOpenChange, type }: AddSkillDialogProps
     
     try {
       if (type === "teach") {
-        // Call backend API to add skill
-        const response = await skillsAPI.addTeachingSkill({
-          name: skillName,
-          level: skillLevel,
-          category: category,
-        })
+        // Try to call backend API first
+        try {
+          const response = await skillsAPI.addTeachingSkill({
+            name: skillName,
+            level: skillLevel,
+            category: category,
+          })
 
-        if (response.success) {
-          // Store skill info temporarily and redirect to test
-          sessionStorage.setItem("pendingSkill", JSON.stringify({ 
-            skillId: response.data.id,
-            skillName, 
-            skillLevel, 
-            category 
-          }))
-          onOpenChange(false)
-          router.push(`/skill-test?skill=${encodeURIComponent(skillName)}`)
+          if (response.success) {
+            // Store skill info temporarily and redirect to test
+            sessionStorage.setItem("pendingSkill", JSON.stringify({ 
+              skillId: response.data.id,
+              skillName, 
+              skillLevel, 
+              category 
+            }))
+            handleDialogChange(false)
+            router.push(`/skill-test?skill=${encodeURIComponent(skillName)}`)
+            return
+          }
+        } catch (apiError: any) {
+          // If backend is not available, use mock service (fallback)
+          // This allows the app to work without backend
+          console.log("Backend not available, using local storage:", apiError.message)
         }
+
+        // Fallback: Add skill locally (for demo/testing when backend is not available)
+        const newSkill: Skill = {
+          id: `skill_${Date.now()}`,
+          name: skillName,
+          level: skillLevel as Skill["level"],
+          category: category,
+        }
+        addSkillToTeach(newSkill)
+        handleDialogChange(false)
       } else {
-        // For "learn" type, add directly (can be implemented later)
-        console.log("Adding skill:", { skillName, skillLevel, category, type })
-        onOpenChange(false)
-        setSkillName("")
-        setSkillLevel("")
-        setCategory("")
+        // For "learn" type, add directly to context
+        const newSkill: Skill = {
+          id: `skill_${Date.now()}`,
+          name: skillName,
+          level: skillLevel as Skill["level"],
+          category: category,
+        }
+        addSkillToLearn(newSkill)
+        handleDialogChange(false)
       }
     } catch (err: any) {
       const errorMessage = err.message || "Failed to add skill. Please try again."
       setError(errorMessage)
       console.error("Error adding skill:", err)
-      
-      // If backend is not running, provide helpful message
-      if (errorMessage.includes("Cannot connect to backend")) {
-        setError("Backend server is not running. Please start the backend server first.")
-      }
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add Skill {type === "teach" ? "to Teach" : "to Learn"}</DialogTitle>

@@ -12,17 +12,32 @@ import { Edit, Save } from "lucide-react"
 import { useState } from "react"
 
 export default function ProfilePage() {
-  const { user } = useAuth()
+  const { user, updateUser } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [name, setName] = useState(user?.name || "")
   const [email, setEmail] = useState(user?.email || "")
   const [bio, setBio] = useState("")
+  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null)
 
   if (!user) return null
 
+  const avatarOptions = [
+    "/student-avatar.png",
+    "/diverse-female-student.png",
+    "/male-student-studying.png",
+    "/latina-student.jpg",
+    "/placeholder-user.jpg",
+  ]
+
   const handleSave = () => {
-    // In a real app, would update profile
-    console.log("Saving profile:", { name, email, bio })
+    const updates: Partial<typeof user> = {
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+    }
+
+    if (selectedAvatar) updates.avatar = selectedAvatar
+
+    updateUser(updates)
     setIsEditing(false)
   }
 
@@ -36,8 +51,11 @@ export default function ProfilePage() {
               <BackButton />
               <h1 className="text-3xl font-bold text-balance mb-2">Profile Settings</h1>
             </div>
-            <p className="text-muted-foreground text-pretty">Manage your account information and preferences</p>
+            <p className="text-muted-foreground text-pretty">
+              Manage your account information and preferences
+            </p>
           </div>
+
           <Button onClick={() => (isEditing ? handleSave() : setIsEditing(true))}>
             {isEditing ? (
               <>
@@ -59,25 +77,45 @@ export default function ProfilePage() {
             <CardTitle>Personal Information</CardTitle>
             <CardDescription>Update your profile details</CardDescription>
           </CardHeader>
+
           <CardContent className="space-y-6">
             <div className="flex items-center gap-6">
               <img
-                src={user.avatar || "/placeholder.svg"}
+                src={selectedAvatar || user.avatar || "/placeholder.svg"}
                 alt={user.name}
                 className="h-24 w-24 rounded-full bg-muted"
               />
+
               {isEditing && (
-                <Button variant="outline" size="sm">
-                  Change Avatar
-                </Button>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Choose an avatar</p>
+                  <div className="flex gap-2">
+                    {avatarOptions.map((a) => (
+                      <button
+                        key={a}
+                        onClick={() => setSelectedAvatar(a)}
+                        className={`h-10 w-10 rounded-full overflow-hidden border ${selectedAvatar === a ? "ring-2 ring-primary" : ""
+                          }`}
+                      >
+                        <img src={a} alt={a} className="h-full w-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} disabled={!isEditing} />
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={!isEditing}
+                />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -110,16 +148,19 @@ export default function ProfilePage() {
             <CardTitle>Your Stats</CardTitle>
             <CardDescription>Overview of your activity on SkillSwap</CardDescription>
           </CardHeader>
+
           <CardContent>
             <div className="grid gap-6 md:grid-cols-3">
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Skills Teaching</p>
                 <p className="text-3xl font-bold text-accent">{user.skillsTeach.length}</p>
               </div>
+
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Skills Learning</p>
                 <p className="text-3xl font-bold text-primary">{user.skillsLearn.length}</p>
               </div>
+
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Total Credits</p>
                 <p className="text-3xl font-bold text-chart-3">{user.credits}</p>
@@ -134,21 +175,29 @@ export default function ProfilePage() {
             <CardTitle>Earned Badges</CardTitle>
             <CardDescription>Achievements you've unlocked</CardDescription>
           </CardHeader>
+
           <CardContent>
-            <div className="flex flex-wrap gap-3">
-              {user.badges.map((badge) => (
-                <div
-                  key={badge.id}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/10 border border-accent/20"
-                >
-                  <span className="text-2xl">{badge.icon}</span>
-                  <div>
-                    <p className="font-medium text-sm">{badge.name}</p>
-                    <p className="text-xs text-muted-foreground">{badge.description}</p>
+            {user.badges.length > 0 ? (
+              <div className="flex flex-wrap gap-3">
+                {user.badges.map((badge) => (
+                  <div
+                    key={badge.id}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/10 border border-accent/20"
+                  >
+                    <span className="text-2xl">{badge.icon}</span>
+                    <div>
+                      <p className="font-medium text-sm">{badge.name}</p>
+                      <p className="text-xs text-muted-foreground">{badge.description}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="mb-2">No badges earned yet</p>
+                <p className="text-sm">Start teaching and learning to earn your first badge!</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -158,25 +207,34 @@ export default function ProfilePage() {
             <CardTitle>Preferences</CardTitle>
             <CardDescription>Customize your experience</CardDescription>
           </CardHeader>
+
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">Email Notifications</p>
-                <p className="text-sm text-muted-foreground">Receive updates about sessions and matches</p>
+                <p className="text-sm text-muted-foreground">
+                  Receive updates about sessions and matches
+                </p>
               </div>
               <Badge variant="secondary">Enabled</Badge>
             </div>
+
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">Profile Visibility</p>
-                <p className="text-sm text-muted-foreground">Let others discover your profile</p>
+                <p className="text-sm text-muted-foreground">
+                  Let others discover your profile
+                </p>
               </div>
               <Badge variant="secondary">Public</Badge>
             </div>
+
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">AI Matching</p>
-                <p className="text-sm text-muted-foreground">Get personalized mentor recommendations</p>
+                <p className="text-sm text-muted-foreground">
+                  Get personalized mentor recommendations
+                </p>
               </div>
               <Badge variant="secondary">Enabled</Badge>
             </div>

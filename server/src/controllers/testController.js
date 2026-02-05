@@ -4,6 +4,7 @@
  */
 
 import { submitTest, submitTestFeedback } from '../services/testService.js';
+import { generateQuestionsForSkill } from '../services/aiQuestionService.js';
 import { validationResult } from 'express-validator';
 import { getSkillById } from '../services/skillService.js';
 
@@ -34,13 +35,13 @@ export async function submitTestAnswers(req, res) {
       });
     }
 
-    const result = submitTest(userId, skillId, answers, category);
+    const result = await submitTest(userId, skillId, answers, category);
 
     res.json({
       success: true,
       data: result,
-      message: result.passed 
-        ? 'Test passed! You can now teach this skill.' 
+      message: result.passed
+        ? 'Test passed! You can now teach this skill.'
         : 'Test failed. Please retake the test.'
     });
   } catch (error) {
@@ -81,6 +82,35 @@ export async function submitFeedback(req, res) {
     res.status(400).json({
       success: false,
       message: error.message || 'Failed to submit feedback'
+    });
+  }
+}
+
+/**
+ * Generate skill test questions
+ * GET /api/skill-test?skill=React%20Development
+ */
+export async function generateSkillTest(req, res) {
+  try {
+    const { skill } = req.query;
+
+    if (!skill) {
+      return res.status(400).json({
+        success: false,
+        message: 'Skill parameter is required'
+      });
+    }
+
+    // Generate exactly 10 questions for the skill
+    const questions = await generateQuestionsForSkill(skill, 10);
+
+    // Return questions in the required format
+    res.json(questions);
+  } catch (error) {
+    console.error('Error generating skill test:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate skill test questions'
     });
   }
 }

@@ -1,31 +1,27 @@
 "use client"
 
 import type React from "react"
-
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { useState } from "react"
-import { useAuth } from "@/contexts/auth-context"
+import dynamic from "next/dynamic"
 import { GraduationCap, Sparkles, Users, TrendingUp } from "lucide-react"
 
-export default function LoginPage() {
-  const [isLogin, setIsLogin] = useState(true)
-  const [email, setEmail] = useState("")
-  const [name, setName] = useState("")
-  const { login, isAuthenticated } = useAuth()
-  const router = useRouter()
+// Dynamically import the login form to avoid SSR hydration issues
+const LoginForm = dynamic(() => import("@/components/login-form").then(mod => ({ default: mod.LoginForm })), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full max-w-md">
+      <div className="animate-pulse">
+        <div className="h-8 bg-muted rounded mb-4"></div>
+        <div className="space-y-3">
+          <div className="h-10 bg-muted rounded"></div>
+          <div className="h-10 bg-muted rounded"></div>
+          <div className="h-10 bg-muted rounded"></div>
+        </div>
+      </div>
+    </div>
+  )
+})
 
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    router.push("/dashboard")
-  }
-
+export default function HomePage() {
   return (
     <div className="min-h-screen flex">
       {/* Left side - Branding */}
@@ -101,64 +97,7 @@ export default function LoginPage() {
 
       {/* Right side - Auth Form */}
       <div className="flex-1 flex items-center justify-center p-8 bg-background">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-4 lg:hidden">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-lg">
-                SS
-              </div>
-              <span className="text-xl font-bold">SkillSwap</span>
-            </div>
-            <CardTitle className="text-2xl">{isLogin ? "Welcome back" : "Create account"}</CardTitle>
-            <CardDescription>
-              {isLogin ? "Sign in to continue your learning journey" : "Start teaching and learning with peers"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {!isLogin && (
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="Rufiya"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required={!isLogin}
-                  />
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="rufiya@university.edu"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" placeholder="••••••••" required />
-              </div>
-              <Button type="submit" className="w-full" size="lg">
-                {isLogin ? "Sign in" : "Create account"}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center text-sm">
-              <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-primary hover:underline">
-                {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
-              </button>
-            </div>
-
-            <div className="mt-4 p-3 bg-muted rounded-lg text-xs text-muted-foreground text-center">
-              Demo app - Any email and password will work
-            </div>
-          </CardContent>
-        </Card>
+        <LoginForm />
       </div>
     </div>
   )

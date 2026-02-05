@@ -6,8 +6,9 @@ Backend server for the SkillSwap platform built with Node.js and Express.
 
 - RESTful API for skill management
 - Skill test questions and scoring
+- **AI-powered question generation** for skills without predefined tests
 - Test feedback and ratings
-- SQLite database for data persistence
+- JSON file-based database for simplicity
 - Input validation and error handling
 - CORS enabled for frontend communication
 
@@ -23,10 +24,18 @@ npm install
 PORT=3001
 NODE_ENV=development
 FRONTEND_URL=http://localhost:3000
-DB_PATH=./data/skillswap.db
+DB_PATH=./data/skillswap.json
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-3. Start the server:
+3. **AI Question Generation (Optional)**
+   - Get an OpenAI API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+   - Add it to your `.env` file as `OPENAI_API_KEY`
+   - If not configured, the system will use mock questions for skills without predefined tests
+   - With API key: Generates real, contextual questions using GPT-3.5-turbo
+   - Without API key: Uses mock questions for development/testing
+
+4. Start the server:
 ```bash
 npm run dev
 ```
@@ -46,8 +55,49 @@ The server will run on `http://localhost:3001`
 
 ### Tests
 
+- `GET /api/skill-test?skill=<skill_name>` - Generate AI-powered skill test questions
 - `POST /api/tests/submit` - Submit test answers
 - `POST /api/tests/feedback` - Submit test feedback/rating
+
+### Skill Test Generation
+
+**GET /api/skill-test**
+
+Generates 10 multiple-choice questions for a specific skill using AI.
+
+**Query Parameters:**
+- `skill` (required): The skill name (e.g., "React Development", "Python Programming")
+
+**Response Format:**
+```json
+[
+  {
+    "question": "What is JSX in React?",
+    "options": [
+      "A JavaScript extension for XML",
+      "A styling library for React",
+      "A state management tool",
+      "A routing library"
+    ],
+    "correctAnswer": "A"
+  }
+]
+```
+
+**Supported Skills:**
+- React Development
+- Python Programming
+- Machine Learning
+- UI/UX Design
+- Spanish
+- German
+- And any custom skill (uses general knowledge prompts)
+
+**Notes:**
+- Requires OpenAI API key for real questions
+- Falls back to mock questions if API key not configured
+- Questions are beginner to intermediate difficulty
+- Exactly 10 questions with 4 options each
 
 ## Project Structure
 

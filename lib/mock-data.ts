@@ -4,11 +4,14 @@ export interface User {
   id: string
   name: string
   email: string
+  password: string // Hashed password for authentication
   avatar: string
   credits: number
   badges: Badge[]
   skillsTeach: Skill[]
   skillsLearn: Skill[]
+  // Joined community IDs to track which communities the user has joined
+  joinedCommunities?: string[]
 }
 
 export interface Skill {
@@ -84,6 +87,7 @@ export const currentUser: User = {
   id: "1",
   name: "Rufiya",
   email: "rufiya@university.edu",
+  password: "password123",
   avatar: "/student-avatar.png",
   credits: 250,
   badges: [
@@ -119,6 +123,7 @@ export const currentUser: User = {
     { id: "s5", name: "Photography", level: "Beginner", category: "Creative" },
     { id: "s6", name: "Spanish", level: "Intermediate", category: "Language" },
   ],
+  joinedCommunities: [],
 }
 
 // AI-recommended matches

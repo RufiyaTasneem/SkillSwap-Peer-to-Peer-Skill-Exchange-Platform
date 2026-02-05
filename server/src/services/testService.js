@@ -15,9 +15,9 @@ import { getQuestionsByCategory } from './questionService.js';
  * @param {string} category - Question category
  * @returns {Object} Test result with score and pass status
  */
-export function submitTest(userId, skillId, answers, category) {
+export async function submitTest(userId, skillId, answers, category) {
   // Get questions for the category
-  const questions = getQuestionsByCategory(category);
+  const questions = await getQuestionsByCategory(category);
 
   if (questions.length === 0) {
     throw new Error('No questions found for this category');
@@ -84,7 +84,7 @@ export function submitTestFeedback(testResultId, rating, review = '') {
 
   // Check if feedback already exists
   const existingFeedback = db.find('test_feedback', tf => tf.test_result_id === testResultId);
-  
+
   let feedbackId;
   if (existingFeedback && existingFeedback.length > 0) {
     // Update existing feedback

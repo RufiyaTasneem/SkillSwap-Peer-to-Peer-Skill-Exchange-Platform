@@ -5,16 +5,22 @@ import { Button } from "@/components/ui/button"
 import { BackButton } from "@/components/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { sessions } from "@/lib/mock-data"
+import { sessions as defaultSessions } from "@/lib/mock-data"
 import { Calendar, Clock, MapPin, Video, Plus, CheckCircle2, XCircle, Copy, AlertCircle, Check } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { ScheduleSessionDialog } from "@/components/schedule-session-dialog"
 import { useAuth } from "@/contexts/auth-context"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  loadSessionsForUser,
+  markSessionCompleted,
+  markSessionInProgress,
+  saveSessionsForUser,
+} from "@/lib/session-service"
 
 export default function SessionsPage() {
-  const { user } = useAuth()
+  const { user, updateCredits } = useAuth()
   const [showSchedule, setShowSchedule] = useState(false)
   const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null)
   const [mentorLink, setMentorLink] = useState("")
@@ -22,9 +28,14 @@ export default function SessionsPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
   const [mentorSessions, setMentorSessions] = useState<Array<{ mentor: string; skill: string; link: string }>>([])
+  const [userSessions, setUserSessions] = useState(defaultSessions)
+  const [completionMessage, setCompletionMessage] = useState<string | null>(null)
+  const [completionError, setCompletionError] = useState<string | null>(null)
+  const userId = user?.email || "guest"
+  const teachingCreditAward = 25 // simulation credit award per completed session
 
-  const upcomingSessions = sessions.filter((s) => s.status === "scheduled")
-  const completedSessions = sessions.filter((s) => s.status === "completed")
+  const upcomingSessions = userSessions.filter((s) => s.status !== "completed")
+  const completedSessions = userSessions.filter((s) => s.status === "completed")
 
   const eligibleSkills = useMemo(() => {
     if (!user?.skillsTeach) return []
@@ -41,7 +52,11 @@ export default function SessionsPage() {
         setMentorSessions([])
       }
     }
-  }, [])
+
+    // Load sessions for this user from storage
+    const storedSessions = loadSessionsForUser(userId)
+    setUserSessions(storedSessions)
+  }, [userId])
 
   const saveMentorSession = () => {
     setSaveError(null)
@@ -61,6 +76,30 @@ export default function SessionsPage() {
     localStorage.setItem("mentorSessions", JSON.stringify(updated))
     setSaveSuccess("Meeting link saved")
     setMentorLink("")
+  }
+
+  const handleJoinSession = (sessionId: string, meetingLink?: string) => {
+    // Move session to in-progress when joining
+    const updated = markSessionInProgress(userId, sessionId)
+    setUserSessions(updated)
+    if (meetingLink) {
+      window.open(meetingLink, "_blank")
+    }
+  }
+
+  const handleCompleteSession = (sessionId: string) => {
+    setCompletionMessage(null)
+    setCompletionError(null)
+    try {
+      const { sessions: updated, creditsAwarded } = markSessionCompleted(userId, sessionId, teachingCreditAward)
+      setUserSessions(updated)
+      if (user) {
+        updateCredits((user.credits || 0) + creditsAwarded)
+      }
+      setCompletionMessage("Credits awarded successfully")
+    } catch (err: any) {
+      setCompletionError(err.message || "Could not complete session")
+    }
   }
 
   return (
@@ -169,6 +208,16 @@ export default function SessionsPage() {
           </Card>
         </div>
 
+        {/* Completion feedback */}
+        {(completionMessage || completionError) && (
+          <Card>
+            <CardContent className="p-4">
+              {completionMessage && <p className="text-sm text-green-600">{completionMessage}</p>}
+              {completionError && <p className="text-sm text-red-600">{completionError}</p>}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Sessions List */}
         <Tabs defaultValue="upcoming" className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2">
@@ -248,8 +297,8 @@ export default function SessionsPage() {
                           with {session.mentor === "Rufiya" ? session.mentee : session.mentor}
                         </CardDescription>
                       </div>
-                      <Badge variant="outline" className="bg-accent/10 text-accent border-accent/20">
-                        Scheduled
+                      <Badge variant="outline" className="bg-accent/10 text-accent border-accent/20 capitalize">
+                        {session.status || "scheduled"}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -315,14 +364,27 @@ export default function SessionsPage() {
                               )}
                             </Button>
                           </div>
-                          <Button 
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-6 text-base"
-                            onClick={() => window.open(session.meetingLink, "_blank")}
-                            size="lg"
-                          >
-                            <Video className="h-5 w-5 mr-2" />
-                            Join Google Meet Now
-                          </Button>
+                          <div className="flex flex-col md:flex-row gap-2">
+                            <Button
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-6 text-base"
+                              onClick={() => handleJoinSession(session.id, session.meetingLink)}
+                              size="lg"
+                            >
+                              <Video className="h-5 w-5 mr-2" />
+                              {session.status === "in-progress" ? "Rejoin Meeting" : "Join Google Meet Now"}
+                            </Button>
+                            <Button
+                              className="flex-1"
+                              variant="outline"
+                              disabled={session.status === "completed"}
+                              onClick={() => handleCompleteSession(session.id)}
+                            >
+                              {session.status === "completed" ? "Session Completed" : "Mark Session as Completed"}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Simulation: completion awards teaching credits without a learner confirmation.
+                          </p>
                         </div>
                       )}
                       {session.type === "online" && !session.meetingLink && (

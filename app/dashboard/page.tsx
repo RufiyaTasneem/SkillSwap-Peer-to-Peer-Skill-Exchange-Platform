@@ -8,11 +8,28 @@ import { Plus, Edit, TrendingUp, Award, Calendar, Users } from "lucide-react"
 import { useState } from "react"
 import { AddSkillDialog } from "@/components/add-skill-dialog"
 import Link from "next/link"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export default function DashboardPage() {
-  const { user } = useAuth()
+  const { user, isLoading } = useAuth()
   const [showAddTeach, setShowAddTeach] = useState(false)
   const [showAddLearn, setShowAddLearn] = useState(false)
+
+  // Show loading skeleton while data is loading
+  if (isLoading) {
+    return (
+      <div className="p-8">
+        <div className="max-w-7xl mx-auto space-y-8">
+          <Skeleton className="h-10 w-64" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!user) return null
 
@@ -34,18 +51,18 @@ export default function DashboardPage() {
       iconColor: "text-primary",
     },
     {
-      label: "Sessions This Week",
-      value: 3,
+      label: "Skills Teaching",
+      value: user.skillsTeach.length,
       icon: Calendar,
-      description: "2 teaching, 1 learning",
+      description: "Skills you can teach",
       bgColor: "bg-chart-3/10",
       iconColor: "text-chart-3",
     },
     {
-      label: "Community Circles",
-      value: 5,
+      label: "Skills Learning",
+      value: user.skillsLearn.length,
       icon: Users,
-      description: "Active member",
+      description: "Skills you're learning",
       bgColor: "bg-chart-2/10",
       iconColor: "text-chart-2",
     },
@@ -96,11 +113,15 @@ export default function DashboardPage() {
                   <CardTitle className="text-2xl">{user.name}</CardTitle>
                   <CardDescription>{user.email}</CardDescription>
                   <div className="flex gap-2 mt-2">
-                    {user.badges.slice(0, 3).map((badge) => (
-                      <span key={badge.id} className="text-xl" title={badge.name}>
-                        {badge.icon}
-                      </span>
-                    ))}
+                    {user.badges.length > 0 ? (
+                      user.badges.slice(0, 3).map((badge) => (
+                        <span key={badge.id} className="text-xl" title={badge.name}>
+                          {badge.icon}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-sm text-muted-foreground">No badges earned yet</span>
+                    )}
                   </div>
                 </div>
               </div>

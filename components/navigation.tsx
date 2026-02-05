@@ -19,7 +19,13 @@ const navigation = [
 
 export function Navigation() {
   const pathname = usePathname()
+  const router = useRouter()
   const { user, logout } = useAuth()
+
+  const handleLogout = () => {
+    logout()
+    router.push("/")
+  }
 
   return (
     <nav className="flex h-screen w-64 flex-col border-r border-border bg-card">
@@ -68,7 +74,7 @@ export function Navigation() {
           </div>
           <div className="space-y-2">
             <ThemeToggle />
-            <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={logout}>
+            <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
               Logout
             </Button>

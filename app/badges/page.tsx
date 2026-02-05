@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { Award, TrendingUp, Star, Zap, Sparkles } from "lucide-react"
 import { useState } from "react"
 import { RateSessionDialog } from "@/components/rate-session-dialog"
+import { Skeleton } from "@/components/ui/skeleton"
 
 // Available badges to earn
 const allBadges = [
@@ -103,13 +104,29 @@ const allBadges = [
 ]
 
 export default function BadgesPage() {
-  const { user } = useAuth()
+  const { user, isLoading } = useAuth()
   const [showRating, setShowRating] = useState(false)
+
+  if (isLoading) {
+    return (
+      <div className="p-8">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <Skeleton className="h-10 w-64" />
+          <div className="grid gap-4 md:grid-cols-3">
+            <Skeleton className="h-48 md:col-span-2" />
+            <Skeleton className="h-48" />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!user) return null
 
-  const earnedBadges = allBadges.filter((b) => b.earned)
-  const inProgressBadges = allBadges.filter((b) => !b.earned)
+  // Map user's earned badges to the badge definitions
+  const userBadgeIds = new Set(user.badges.map((b) => b.id))
+  const earnedBadges = allBadges.filter((b) => userBadgeIds.has(b.id))
+  const inProgressBadges = allBadges.filter((b) => !userBadgeIds.has(b.id))
 
   return (
     <div className="p-8">
@@ -143,15 +160,10 @@ export default function BadgesPage() {
                   <span className="text-5xl font-bold text-accent">{user.credits}</span>
                   <span className="text-muted-foreground">credits</span>
                 </div>
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Earned This Month</p>
-                    <p className="text-2xl font-semibold text-accent">+125</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Spent This Month</p>
-                    <p className="text-2xl font-semibold text-primary">-75</p>
-                  </div>
+                <div className="pt-4 border-t border-border">
+                  <p className="text-sm text-muted-foreground">
+                    Credits will update after teaching and learning sessions
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -204,31 +216,55 @@ export default function BadgesPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {earnedBadges.map((badge) => (
-              <Card key={badge.id} className="bg-accent/5 border-accent/20">
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-accent/10 text-3xl">
-                      {badge.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold mb-1">{badge.name}</h3>
-                      <p className="text-sm text-muted-foreground mb-2 leading-relaxed">{badge.description}</p>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="bg-accent/10 text-accent border-accent/20">
-                          Earned
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(badge.earnedAt!).toLocaleDateString()}
-                        </span>
+          {earnedBadges.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {earnedBadges.map((badge) => {
+                // Find the user badge to get earnedAt date
+                const userBadge = user.badges.find((b) => b.id === badge.id)
+                return (
+                  <Card key={badge.id} className="bg-accent/5 border-accent/20">
+                    <CardContent className="p-6">
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-accent/10 text-3xl">
+                          {badge.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold mb-1">{badge.name}</h3>
+                          <p className="text-sm text-muted-foreground mb-2 leading-relaxed">{badge.description}</p>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="bg-accent/10 text-accent border-accent/20">
+                              Earned
+                            </Badge>
+                            {userBadge?.earnedAt && (
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(userBadge.earnedAt).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                    <Award className="h-8 w-8 text-muted-foreground" />
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">No badges earned yet</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Start teaching and learning to earn your first badge!
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* In Progress Badges */}
@@ -274,46 +310,11 @@ export default function BadgesPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
-                { type: "earned", amount: 25, description: "Taught React Development session", date: "2 hours ago" },
-                {
-                  type: "spent",
-                  amount: 20,
-                  description: "Learned Machine Learning Basics",
-                  date: "Yesterday",
-                },
-                { type: "earned", amount: 30, description: "Taught UI/UX Design (5-star rating)", date: "2 days ago" },
-                { type: "earned", amount: 25, description: "Taught Public Speaking", date: "3 days ago" },
-              ].map((activity, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between py-3 border-b border-border last:border-0"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${activity.type === "earned" ? "bg-accent/10" : "bg-primary/10"
-                        }`}
-                    >
-                      {activity.type === "earned" ? (
-                        <TrendingUp className="h-5 w-5 text-accent" />
-                      ) : (
-                        <Zap className="h-5 w-5 text-primary" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{activity.description}</p>
-                      <p className="text-xs text-muted-foreground">{activity.date}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`font-semibold ${activity.type === "earned" ? "text-accent" : "text-primary"}`}>
-                      {activity.type === "earned" ? "+" : "-"}
-                      {activity.amount}
-                    </p>
-                    <p className="text-xs text-muted-foreground">credits</p>
-                  </div>
-                </div>
-              ))}
+              {/* TODO: Replace with actual transaction history when backend is ready */}
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="mb-2">No recent activity</p>
+                <p className="text-sm">Credit transactions will appear here after sessions</p>
+              </div>
             </div>
           </CardContent>
         </Card>

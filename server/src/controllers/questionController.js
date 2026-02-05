@@ -20,7 +20,7 @@ export async function getQuestions(req, res) {
       });
     }
 
-    const questions = getQuestionsByCategory(category);
+    const questions = await getQuestionsByCategory(category);
 
     res.json({
       success: true,

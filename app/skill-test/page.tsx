@@ -14,91 +14,17 @@ import { useAuth } from "@/contexts/auth-context"
 import { BackButton } from "@/components/navigation"
 import type { Skill } from "@/lib/mock-data"
 import { questionsAPI, testsAPI } from "@/lib/api"
-
-// Mock questions based on skill category
-const getQuestionsForSkill = (skillName: string, category: string) => {
-  const baseQuestions: Record<string, Array<{ question: string; options: string[]; correct: number }>> = {
-    Coding: [
-      {
-        question: "What is the primary purpose of version control systems like Git?",
-        options: ["To compile code", "To track changes and collaborate on code", "To run tests", "To deploy applications"],
-        correct: 1,
-      },
-      {
-        question: "Which of these is NOT a JavaScript framework?",
-        options: ["React", "Vue", "Angular", "Python"],
-        correct: 3,
-      },
-      {
-        question: "What does API stand for?",
-        options: ["Application Programming Interface", "Advanced Program Integration", "Automated Process Interface", "Application Process Integration"],
-        correct: 0,
-      },
-      {
-        question: "What is the difference between 'let' and 'var' in JavaScript?",
-        options: ["No difference", "'let' has block scope, 'var' has function scope", "'var' is newer", "They're different languages"],
-        correct: 1,
-      },
-      {
-        question: "What is the purpose of CSS?",
-        options: ["To add interactivity", "To style web pages", "To store data", "To run servers"],
-        correct: 1,
-      },
-    ],
-    Design: [
-      {
-        question: "What does UX stand for?",
-        options: ["User Experience", "User Extension", "Universal Experience", "User Exchange"],
-        correct: 0,
-      },
-      {
-        question: "Which color combination is generally considered most accessible?",
-        options: ["Red on blue", "Yellow on white", "Black on white", "Green on red"],
-        correct: 2,
-      },
-      {
-        question: "What is the purpose of a wireframe?",
-        options: ["Final design", "Layout structure planning", "Color scheme", "Animation"],
-        correct: 1,
-      },
-    ],
-    "AI/ML": [
-      {
-        question: "What is machine learning?",
-        options: ["Manual programming", "Systems that learn from data", "Database management", "Web development"],
-        correct: 1,
-      },
-      {
-        question: "What is a neural network?",
-        options: ["A database", "A computing system inspired by biological neural networks", "A programming language", "A design pattern"],
-        correct: 1,
-      },
-    ],
-    Default: [
-      {
-        question: "What is the most important aspect of teaching?",
-        options: ["Speed", "Understanding your student", "Complexity", "Length"],
-        correct: 1,
-      },
-      {
-        question: "How do you ensure effective learning?",
-        options: ["Lecture only", "Interactive practice and feedback", "Reading only", "Watching videos"],
-        correct: 1,
-      },
-    ],
-  }
-
-  return baseQuestions[category] || baseQuestions.Default
-}
+import { getQuestionsForSkill, hasQuestionsForSkill, getQuestionCount } from "@/lib/question-generator"
+import type { Question } from "@/lib/question-generator"
 
 export default function SkillTestPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, addSkillToTeach } = useAuth()
   const skillName = searchParams.get("skill") || "Unknown Skill"
-  
+
   const [pendingSkill, setPendingSkill] = useState<any>(null)
-  const [questions, setQuestions] = useState<any[]>([])
+  const [questions, setQuestions] = useState<Question[]>([])
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<number[]>([])
   const [score, setScore] = useState<number | null>(null)
@@ -110,50 +36,69 @@ export default function SkillTestPage() {
   const [testResultId, setTestResultId] = useState<string | null>(null)
   const [loadingQuestions, setLoadingQuestions] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [skillNotFound, setSkillNotFound] = useState(false)
+  const [actualSkillName, setActualSkillName] = useState(skillName)
 
   useEffect(() => {
-    // Get pending skill from sessionStorage (if user came from dashboard)
-    // and fetch questions from API or use local fallback
+    // Load questions based on specific skill name (not category)
     const loadQuestions = async () => {
-    const stored = sessionStorage.getItem("pendingSkill")
-
-      let category = "Default"
+      const stored = sessionStorage.getItem("pendingSkill")
       let skillLabel = skillName
 
-    if (stored) {
+      if (stored) {
         try {
-      const skill = JSON.parse(stored)
-      setPendingSkill(skill)
-          category = skill.category || "Default"
+          const skill = JSON.parse(stored)
+          setPendingSkill(skill)
           skillLabel = skill.skillName || skillName
         } catch {
-          // If stored data is invalid, just fall back to default questions
           sessionStorage.removeItem("pendingSkill")
         }
       }
 
+      setActualSkillName(skillLabel)
       setLoadingQuestions(true)
+      setSkillNotFound(false)
+
       try {
-        // Try backend questions first (by category, if available)
-        const response = await questionsAPI.getQuestionsByCategory(category)
-        if (response.success && response.data) {
-          setQuestions(response.data)
-          setAnswers(new Array(response.data.length).fill(-1))
+        // Try backend API first (by skill name if backend supports it)
+        // Note: Backend currently uses category, but we'll try skill name first
+        try {
+          const response = await questionsAPI.getQuestionsByCategory(skillLabel)
+          if (response.success && response.data && Array.isArray(response.data) && response.data.length >= 5) {
+            setQuestions(response.data)
+            setAnswers(new Array(response.data.length).fill(-1))
+            setLoadingQuestions(false)
+            return
+          }
+        } catch {
+          // Backend not available or doesn't have questions for this skill
+        }
+
+        // Use skill-specific question generator
+        const skillQuestions = getQuestionsForSkill(skillLabel)
+
+        if (skillQuestions.length >= 5) {
+          setQuestions(skillQuestions)
+          setAnswers(new Array(skillQuestions.length).fill(-1))
+        } else if (skillQuestions.length > 0) {
+          // Has some questions but not enough
+          setQuestions(skillQuestions)
+          setAnswers(new Array(skillQuestions.length).fill(-1))
+          setSubmitError(`Warning: Only ${skillQuestions.length} questions available. Minimum 5 recommended.`)
         } else {
-          const qs = getQuestionsForSkill(skillLabel, category)
-      setQuestions(qs)
-      setAnswers(new Array(qs.length).fill(-1))
-    }
-      } catch {
-        // Pure client-side fallback
-        const qs = getQuestionsForSkill(skillLabel, category)
-        setQuestions(qs)
-        setAnswers(new Array(qs.length).fill(-1))
+          // No questions found for this skill
+          setSkillNotFound(true)
+          setQuestions([])
+        }
+      } catch (error) {
+        console.error("Error loading questions:", error)
+        setSkillNotFound(true)
+        setQuestions([])
       } finally {
         setLoadingQuestions(false)
       }
     }
-    
+
     loadQuestions()
   }, [router, skillName])
 
@@ -178,23 +123,51 @@ export default function SkillTestPage() {
   const handleSubmit = async () => {
     setSubmitError(null)
 
+    // Validate minimum questions requirement
+    if (questions.length < 5) {
+      setSubmitError("A minimum of 5 questions is required for the skill test.")
+      return
+    }
+
     if (questions.length === 0 || answers.length !== questions.length) {
       setSubmitError("Please answer all questions before submitting.")
       return
     }
 
+    // Check if all questions are answered
+    if (answers.some(a => a === -1)) {
+      setSubmitError("Please answer all questions before submitting.")
+      return
+    }
+
     setIsSubmitting(true)
-    
-    // Pure client-side score calculation
+
+    // Pure client-side score calculation: compare selected index with correctAnswerIndex (backend) or correct (legacy)
     let correct = 0
     questions.forEach((q, idx) => {
-      if (answers[idx] === q.correct) correct++
+      const selectedIndex = answers[idx]
+      let correctIndex: number | undefined = undefined
+
+      if (typeof (q as any).correctAnswerIndex === "number") {
+        correctIndex = (q as any).correctAnswerIndex
+      } else if (typeof (q as any).correct === "number") {
+        correctIndex = (q as any).correct
+      }
+
+      if (typeof correctIndex !== "number") {
+        console.error(`Question missing correctAnswerIndex and correct: ${q.question}`)
+        return
+      }
+
+      if (selectedIndex === correctIndex) {
+        correct++
+      }
     })
-    
+
     const percentage = Math.round((correct / questions.length) * 100)
     setScore(percentage)
     setIsSubmitting(false)
-    
+
     // New pass threshold: 75%
     if (percentage >= 75) {
       // Mark skill as eligible to teach and save in user profile (client-side JSON via auth context)
@@ -204,12 +177,12 @@ export default function SkillTestPage() {
         level: (pendingSkill?.skillLevel as "Beginner" | "Intermediate" | "Advanced" | "Expert") || "Beginner",
         category: pendingSkill?.category || "Other",
         testResult: {
-        score: percentage,
-        passed: true,
-        date: new Date().toISOString(),
+          score: percentage,
+          passed: true,
+          date: new Date().toISOString(),
         },
       }
-      
+
       addSkillToTeach(newSkill)
       sessionStorage.removeItem("pendingSkill")
       alert("You are eligible to teach this skill")
@@ -237,17 +210,17 @@ export default function SkillTestPage() {
       }
 
       // Store review locally as well
-    const review = {
-      skillName: pendingSkill.skillName,
-      rating: testRating,
-      review: testReview,
-      date: new Date().toISOString(),
-    }
-    
-    const reviews = JSON.parse(localStorage.getItem("skillTestReviews") || "[]")
-    reviews.push(review)
-    localStorage.setItem("skillTestReviews", JSON.stringify(reviews))
-      
+      const review = {
+        skillName: pendingSkill.skillName,
+        rating: testRating,
+        review: testReview,
+        date: new Date().toISOString(),
+      }
+
+      const reviews = JSON.parse(localStorage.getItem("skillTestReviews") || "[]")
+      reviews.push(review)
+      localStorage.setItem("skillTestReviews", JSON.stringify(reviews))
+
       // Also update the test result with rating and review
       const testResultKey = `skillTest_${pendingSkill.skillName}`
       const existingResult = localStorage.getItem(testResultKey)
@@ -257,7 +230,7 @@ export default function SkillTestPage() {
         result.testReview = testReview
         localStorage.setItem(testResultKey, JSON.stringify(result))
       }
-      
+
       // Add skill to user's teach list with rating and review
       const newSkill: Skill = {
         id: pendingSkill.skillId || `skill_${Date.now()}`,
@@ -273,12 +246,12 @@ export default function SkillTestPage() {
         testReview: testReview || undefined,
       }
       addSkillToTeach(newSkill)
-      
+
       // Clean up session storage
       sessionStorage.removeItem("pendingSkill")
-    
-    // Redirect to dashboard
-    router.push("/dashboard")
+
+      // Redirect to dashboard
+      router.push("/dashboard")
     } catch (error) {
       console.error("Error submitting feedback:", error)
       // Still redirect even if feedback submission fails
@@ -291,7 +264,8 @@ export default function SkillTestPage() {
   const canSubmit = answers.every(a => a !== -1) && !isSubmitting
   const passed = score !== null && score >= 75
 
-  if (loadingQuestions || questions.length === 0) {
+  // Show loading state
+  if (loadingQuestions) {
     return (
       <div className="min-h-screen p-8">
         <div className="max-w-2xl mx-auto">
@@ -299,7 +273,50 @@ export default function SkillTestPage() {
           <Card className="mt-4">
             <CardContent className="p-6 text-center">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-              <p>{loadingQuestions ? "Loading questions..." : "Loading test..."}</p>
+              <p>Loading questions for {actualSkillName}...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  // Show fallback message if skill not found or insufficient questions
+  if (skillNotFound || questions.length < 5) {
+    return (
+      <div className="min-h-screen p-8">
+        <div className="max-w-2xl mx-auto">
+          <BackButton />
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-primary" />
+                Skill Test: {actualSkillName}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert>
+                <AlertDescription>
+                  <p className="font-medium mb-2">Skill test for "{actualSkillName}" is coming soon!</p>
+                  <p className="text-sm text-muted-foreground">
+                    We're working on adding questions for this skill. Please check back later or try a different skill.
+                  </p>
+                </AlertDescription>
+              </Alert>
+              {questions.length > 0 && questions.length < 5 && (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    <p className="font-medium mb-2">Insufficient Questions</p>
+                    <p className="text-sm">
+                      Only {questions.length} question{questions.length !== 1 ? "s" : ""} available.
+                      A minimum of 5 questions is required for the skill test.
+                    </p>
+                  </AlertDescription>
+                </Alert>
+              )}
+              <Button onClick={() => router.push("/dashboard")} className="w-full">
+                Back to Dashboard
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -355,11 +372,10 @@ export default function SkillTestPage() {
                       className="transition-transform hover:scale-110"
                     >
                       <Star
-                        className={`h-10 w-10 ${
-                          star <= (hoveredRating || testRating)
+                        className={`h-10 w-10 ${star <= (hoveredRating || testRating)
                             ? "fill-amber-400 text-amber-400"
                             : "fill-muted text-muted-foreground"
-                        }`}
+                          }`}
                       />
                     </button>
                   ))}
@@ -378,7 +394,7 @@ export default function SkillTestPage() {
                   </p>
                 )}
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="review">Your Review (Optional)</Label>
                 <Textarea
@@ -389,14 +405,14 @@ export default function SkillTestPage() {
                   rows={4}
                 />
               </div>
-              
+
               <div className="bg-accent/10 rounded-lg p-3 text-sm">
                 <p className="font-medium text-accent mb-1">Thank you for your feedback!</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Your review helps us improve the AI skill test quality and ensures better matching for our community
                 </p>
               </div>
-              
+
               <div className="flex gap-2 justify-end">
                 <Button
                   type="button"
@@ -424,8 +440,8 @@ export default function SkillTestPage() {
                   Skip
                 </Button>
                 <Button onClick={handleReviewSubmit} disabled={testRating === 0}>
-                Submit Review & Continue
-              </Button>
+                  Submit Review & Continue
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -436,6 +452,21 @@ export default function SkillTestPage() {
 
   // Show score/results only if not showing review form
   if (score !== null && !showReview) {
+    const correctCount = questions.reduce((acc, q, idx) => {
+      const selectedIndex = answers[idx]
+      let correctIndex: number | undefined = undefined
+
+      if (typeof (q as any).correctAnswerIndex === "number") correctIndex = (q as any).correctAnswerIndex
+      else if (typeof (q as any).correct === "number") correctIndex = (q as any).correct
+
+      if (typeof correctIndex !== "number") {
+        console.error(`Question missing correctAnswerIndex and correct: ${q.question}`)
+        return acc
+      }
+
+      return acc + (selectedIndex === correctIndex ? 1 : 0)
+    }, 0)
+
     return (
       <div className="min-h-screen p-8">
         <div className="max-w-2xl mx-auto">
@@ -460,10 +491,10 @@ export default function SkillTestPage() {
               <div className="text-center py-4">
                 <div className="text-4xl font-bold mb-2">{score}%</div>
                 <p className="text-muted-foreground">
-                  You got {answers.filter((a, idx) => a === questions[idx].correct).length} out of {questions.length} questions correct
+                  You got {correctCount} out of {questions.length} questions correct
                 </p>
               </div>
-              
+
               {passed ? (
                 <Alert>
                   <CheckCircle2 className="h-4 w-4" />
@@ -475,11 +506,11 @@ export default function SkillTestPage() {
                 <Alert variant="destructive">
                   <XCircle className="h-4 w-4" />
                   <AlertDescription>
-                    You need at least 70% to pass. You can retake the test to improve your score.
+                    You need at least 75% to pass. You can retake the test to improve your score.
                   </AlertDescription>
                 </Alert>
               )}
-              
+
               <div className="flex gap-2">
                 {!passed && (
                   <Button
@@ -513,22 +544,28 @@ export default function SkillTestPage() {
     <div className="min-h-screen p-8">
       <div className="max-w-2xl mx-auto space-y-4">
         <BackButton />
-        
+
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2 mb-2">
               <Brain className="h-5 w-5 text-primary" />
-              <CardTitle>AI Skill Test: {skillName}</CardTitle>
+              <CardTitle>AI Skill Test: {actualSkillName}</CardTitle>
             </div>
             <CardDescription>
-              Answer all questions to verify your proficiency. You need 70% to pass.
+              Answer all {questions.length} questions to verify your proficiency in {actualSkillName}. You need 75% to pass.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {submitError && (
+              <Alert variant="destructive">
+                <AlertDescription>{submitError}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span>Question {currentQuestion + 1} of {questions.length}</span>
-                <span>{Math.round(progress)}% Complete</span>
+                <span className="font-medium">Question {currentQuestion + 1} of {questions.length}</span>
+                <span className="text-muted-foreground">{Math.round(progress)}% Complete</span>
               </div>
               <Progress value={progress} />
             </div>
@@ -537,7 +574,7 @@ export default function SkillTestPage() {
               <h3 className="text-lg font-semibold">
                 {questions[currentQuestion].question}
               </h3>
-              
+
               <RadioGroup
                 value={answers[currentQuestion] !== -1 ? answers[currentQuestion].toString() : undefined}
                 onValueChange={handleAnswerSelect}
@@ -561,7 +598,7 @@ export default function SkillTestPage() {
               >
                 Previous
               </Button>
-              
+
               {currentQuestion < questions.length - 1 ? (
                 <Button onClick={handleNext} disabled={answers[currentQuestion] === -1}>
                   Next
