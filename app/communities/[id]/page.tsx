@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { communities, communityPosts } from "@/lib/mock-data"
+import { loadAllCommunities } from "@/lib/mock-service"
+import { communityPosts } from "@/lib/mock-data"
 import { Users, Heart, MessageSquare, Send, ArrowLeft } from "lucide-react"
 import { useState } from "react"
 import Link from "next/link"
@@ -17,8 +18,16 @@ export default function CommunityDetailPage() {
   const params = useParams()
   const [newPost, setNewPost] = useState("")
   const [joined, setJoined] = useState(false)
+  const [posts, setPosts] = useState(communityPosts)
 
-  const community = communities.find((c) => c.id === params.id)
+  // Normalize params.id to handle string | string[] and ensure string type
+  const communityId = String(Array.isArray(params.id) ? params.id[0] : params.id)
+
+  // Load communities from the same source as the list page
+  // Convert Record to array since loadAllCommunities() returns Record<string, Community>
+  const communities = Object.values(loadAllCommunities())
+
+  const community = communities.find((c) => c.id === communityId)
 
   if (!community) {
     return (
@@ -38,11 +47,39 @@ export default function CommunityDetailPage() {
     )
   }
 
+  // Derive UI-friendly fields from the stored community shape
+  const communityIcon = community.skillTag.split(" ")[0][0]
+  const communityDescription = `${community.skillTag} community for discussion and resources.`
+
   const handleSubmitPost = (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, would create post
-    console.log("New post:", newPost)
+    if (!newPost.trim()) return
+
+    // Create new post object with mock values
+    const newPostObject = {
+      id: `post_${Date.now()}`,
+      author: "You",
+      content: newPost,
+      timestamp: "just now",
+      avatar: "/placeholder-user.jpg",
+      likes: 0,
+      comments: 0,
+    }
+
+    // Add new post to the beginning of the posts array
+    setPosts([newPostObject, ...posts])
     setNewPost("")
+  }
+
+  const handleLike = (postId: string) => {
+    setPosts(posts.map((post) =>
+      post.id === postId ? { ...post, likes: post.likes + 1 } : post
+    ))
+  }
+
+  const handleComment = (postId: string) => {
+    console.log("Comment on post:", postId)
+    // Placeholder: would open comment dialog in a full app
   }
 
   return (
@@ -62,17 +99,17 @@ export default function CommunityDetailPage() {
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-4 flex-1">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-3xl">
-                  {community.icon}
+                  {communityIcon}
                 </div>
                 <div className="flex-1">
                   <CardTitle className="text-2xl mb-2">{community.name}</CardTitle>
-                  <CardDescription className="text-base leading-relaxed">{community.description}</CardDescription>
+                  <CardDescription className="text-base leading-relaxed">{communityDescription}</CardDescription>
                   <div className="flex items-center gap-4 mt-3">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Users className="h-4 w-4" />
-                      <span>{community.members} members</span>
+                      <span>{community.membersCount} members</span>
                     </div>
-                    <Badge>{community.category}</Badge>
+                    <Badge>{community.skillTag}</Badge>
                   </div>
                 </div>
               </div>
@@ -109,7 +146,7 @@ export default function CommunityDetailPage() {
         <div className="space-y-4">
           <h2 className="text-xl font-bold">Recent Posts</h2>
 
-          {communityPosts.map((post) => (
+          {posts.map((post) => (
             <Card key={post.id}>
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
@@ -128,11 +165,11 @@ export default function CommunityDetailPage() {
                     </div>
                     <p className="text-sm leading-relaxed mb-4">{post.content}</p>
                     <div className="flex items-center gap-4">
-                      <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors">
+                      <button onClick={() => handleLike(post.id)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors">
                         <Heart className="h-4 w-4" />
                         <span>{post.likes}</span>
                       </button>
-                      <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+                      <button onClick={() => handleComment(post.id)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                         <MessageSquare className="h-4 w-4" />
                         <span>{post.comments}</span>
                       </button>
@@ -143,7 +180,7 @@ export default function CommunityDetailPage() {
             </Card>
           ))}
 
-          {communityPosts.length === 0 && (
+          {posts.length === 0 && (
             <Card>
               <CardContent className="p-12 text-center">
                 <div className="flex flex-col items-center gap-4">
