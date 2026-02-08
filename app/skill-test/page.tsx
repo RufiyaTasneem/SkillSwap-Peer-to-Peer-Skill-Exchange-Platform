@@ -1,5 +1,5 @@
 "use client"
-
+export const dynamic = "force-dynamic"
 import React, { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -373,8 +373,8 @@ export default function SkillTestPage() {
                     >
                       <Star
                         className={`h-10 w-10 ${star <= (hoveredRating || testRating)
-                            ? "fill-amber-400 text-amber-400"
-                            : "fill-muted text-muted-foreground"
+                          ? "fill-amber-400 text-amber-400"
+                          : "fill-muted text-muted-foreground"
                           }`}
                       />
                     </button>
