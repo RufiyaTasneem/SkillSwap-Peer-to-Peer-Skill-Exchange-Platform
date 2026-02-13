@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -16,7 +16,8 @@ import { questionsAPI, testsAPI } from "@/lib/api"
 import { getQuestionsForSkill, hasQuestionsForSkill, getQuestionCount } from "@/lib/question-generator"
 import type { Question } from "@/lib/question-generator"
 
-export default function SkillTestPage() {
+function SkillTestPageContent() {
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, addSkillToTeach } = useAuth()
@@ -619,5 +620,12 @@ export default function SkillTestPage() {
         </Card>
       </div>
     </div>
+  )
+}
+export default function SkillTestPage() {
+  return (
+    <Suspense fallback={<div className="p-8">Loading...</div>}>
+      <SkillTestPageContent />
+    </Suspense>
   )
 }
