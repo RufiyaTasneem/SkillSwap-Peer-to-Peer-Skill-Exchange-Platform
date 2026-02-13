@@ -13,7 +13,8 @@ import { useAuth } from "@/contexts/auth-context"
 import { BackButton } from "@/components/navigation"
 import type { Skill } from "@/lib/mock-data"
 import { questionsAPI, testsAPI } from "@/lib/api"
-import { getQuestionsForSkill, hasQuestionsForSkill, getQuestionCount } from "@/lib/question-generator"
+import { getQuestionsForSkill } from "@/lib/question-generator"
+
 import type { Question } from "@/lib/question-generator"
 
 function SkillTestPageContent() {
