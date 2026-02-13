@@ -45,7 +45,7 @@ export function AddSkillDialog({ open, onOpenChange, type }: AddSkillDialogProps
     e.preventDefault()
     setError("")
     setIsSubmitting(true)
-    
+
     try {
       if (type === "teach") {
         // Try to call backend API first
@@ -58,11 +58,11 @@ export function AddSkillDialog({ open, onOpenChange, type }: AddSkillDialogProps
 
           if (response.success) {
             // Store skill info temporarily and redirect to test
-            sessionStorage.setItem("pendingSkill", JSON.stringify({ 
+            sessionStorage.setItem("pendingSkill", JSON.stringify({
               skillId: response.data.id,
-              skillName, 
-              skillLevel, 
-              category 
+              skillName,
+              skillLevel,
+              category
             }))
             handleDialogChange(false)
             router.push(`/skill-test?skill=${encodeURIComponent(skillName)}`)
@@ -75,15 +75,19 @@ export function AddSkillDialog({ open, onOpenChange, type }: AddSkillDialogProps
         }
 
         // Fallback: Add skill locally (for demo/testing when backend is not available)
-        const newSkill: Skill = {
-          id: `skill_${Date.now()}`,
-          name: skillName,
-          level: skillLevel as Skill["level"],
-          category: category,
-        }
-        addSkillToTeach(newSkill)
+        // Fallback: still redirect to skill test instead of adding directly
+        sessionStorage.setItem("pendingSkill", JSON.stringify({
+          skillId: `skill_${Date.now()}`,
+          skillName,
+          skillLevel,
+          category,
+        }))
+
         handleDialogChange(false)
-      } else {
+        router.push(`/skill-test?skill=${encodeURIComponent(skillName)}`)
+        return
+      }
+      else {
         // For "learn" type, add directly to context
         const newSkill: Skill = {
           id: `skill_${Date.now()}`,
