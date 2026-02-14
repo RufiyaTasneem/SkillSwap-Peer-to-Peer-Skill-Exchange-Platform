@@ -6,8 +6,10 @@
 /* Updated to Indigo + Teal color palette for modern EdTech aesthetic */
 :root {
   /* Base colors - Light gray background, dark text */
-  --background: oklch(0.99 0.002 240); /* #F9FAFB equivalent */
-  --foreground: oklch(0.2 0.01 240); /* #111827 equivalent */
+  --background: oklch(0.99 0.002 240);
+  /* #F9FAFB equivalent */
+  --foreground: oklch(0.2 0.01 240);
+  /* #111827 equivalent */
 
   /* Card colors - White with subtle shadows */
   --card: oklch(1 0 0);
@@ -45,11 +47,16 @@
   --ring: oklch(0.525 0.178 276);
 
   /* Charts - Indigo and Teal focused */
-  --chart-1: oklch(0.525 0.178 276); /* Indigo */
-  --chart-2: oklch(0.67 0.14 182); /* Teal */
-  --chart-3: oklch(0.75 0.19 69); /* Amber accent */
-  --chart-4: oklch(0.6 0.15 258); /* Purple */
-  --chart-5: oklch(0.55 0.12 220); /* Blue */
+  --chart-1: oklch(0.525 0.178 276);
+  /* Indigo */
+  --chart-2: oklch(0.67 0.14 182);
+  /* Teal */
+  --chart-3: oklch(0.75 0.19 69);
+  /* Amber accent */
+  --chart-4: oklch(0.6 0.15 258);
+  /* Purple */
+  --chart-5: oklch(0.55 0.12 220);
+  /* Blue */
 
   /* Border radius */
   --radius: 0.5rem;
@@ -67,11 +74,14 @@
 
 .dark {
   /* Dark mode colors - Deep slate background (#0F172A), lighter Indigo & Teal */
-  --background: oklch(0.15 0.01 240); /* #0F172A equivalent */
-  --foreground: oklch(0.9 0.005 240); /* #E5E7EB equivalent */
+  --background: oklch(0.15 0.01 240);
+  /* #0F172A equivalent */
+  --foreground: oklch(0.9 0.005 240);
+  /* #E5E7EB equivalent */
 
   /* Card colors - Slate (#1E293B) */
-  --card: oklch(0.19 0.01 240); /* #1E293B equivalent */
+  --card: oklch(0.19 0.01 240);
+  /* #1E293B equivalent */
   --card-foreground: oklch(0.9 0.005 240);
 
   /* Popover colors */
@@ -79,7 +89,8 @@
   --popover-foreground: oklch(0.9 0.005 240);
 
   /* Primary - Lighter Indigo (#6366F1) for dark mode */
-  --primary: oklch(0.58 0.18 276); /* #6366F1 equivalent */
+  --primary: oklch(0.58 0.18 276);
+  /* #6366F1 equivalent */
   --primary-foreground: oklch(1 0 0);
 
   /* Secondary - Darker slate for dark mode */
@@ -91,7 +102,8 @@
   --muted-foreground: oklch(0.65 0.01 240);
 
   /* Accent - Lighter Teal (#2DD4BF) for dark mode */
-  --accent: oklch(0.75 0.14 182); /* #2DD4BF equivalent */
+  --accent: oklch(0.75 0.14 182);
+  /* #2DD4BF equivalent */
   --accent-foreground: oklch(0.15 0.01 240);
 
   /* Destructive - Red for errors in dark mode */
@@ -106,8 +118,10 @@
   --ring: oklch(0.58 0.18 276);
 
   /* Charts - adjusted for dark mode */
-  --chart-1: oklch(0.58 0.18 276); /* Lighter Indigo */
-  --chart-2: oklch(0.75 0.14 182); /* Lighter Teal */
+  --chart-1: oklch(0.58 0.18 276);
+  /* Lighter Indigo */
+  --chart-2: oklch(0.75 0.14 182);
+  /* Lighter Teal */
   --chart-3: oklch(0.75 0.19 69);
   --chart-4: oklch(0.6 0.15 258);
   --chart-5: oklch(0.55 0.12 220);
@@ -172,6 +186,7 @@
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 200ms;
   }
+
   body {
     @apply bg-background text-foreground;
   }
