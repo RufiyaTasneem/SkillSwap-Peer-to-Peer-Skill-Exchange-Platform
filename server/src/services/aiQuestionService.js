@@ -2,6 +2,8 @@
  * AI Question Generation Service
  * Uses OpenAI to generate skill test questions when predefined ones don't exist
  */
+const normalizeKey = (s) =>
+    String(s).trim().toLowerCase().replace(/\s+/g, " ")
 
 import OpenAI from 'openai';
 
@@ -56,7 +58,7 @@ function normalizeQuestions(questions) {
  * Predefined high-quality questions for each skill
  * These are manually crafted to ensure quality and accuracy
  */
-const predefinedQuestions = {
+const RAW_QUESTIONS = {
     "Python Programming": [
         {
             "question": "What is the output of print(type([]))?",
@@ -799,7 +801,12 @@ const predefinedQuestions = {
         }
     ]
 };
-
+const predefinedQuestions = Object.fromEntries(
+    Object.entries(RAW_QUESTIONS).map(([k, v]) => [
+        normalizeKey(k),
+        v
+    ])
+)
 /**
  * Skill guides mapping for better AI prompt generation
  */
@@ -1085,20 +1092,11 @@ function generateMockQuestions(skillName, count = 10) {
     for (let i = 0; i < count; i++) {
         if (i < skillMocks.length) {
             mockQuestions.push(skillMocks[i]);
-        } else {
-            // Fallback for skills without specific mocks
-            const correctLetter = letters[Math.floor(Math.random() * 4)];
-            mockQuestions.push({
-                question: `What is a key concept in ${skillName}?`,
-                options: [
-                    `First option for ${skillName}`,
-                    `Second option for ${skillName}`,
-                    `Third option for ${skillName}`,
-                    `Fourth option for ${skillName}`
-                ],
-                correctAnswer: correctLetter
-            });
         }
+        else {
+            throw new Error(`No mock questions for skill: ${skillName}`);
+        }
+
     }
     return mockQuestions.slice(0, count);
 }
