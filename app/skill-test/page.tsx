@@ -1,6 +1,6 @@
 "use client"
 
-// 🔧 NORMALIZER (critical fix)
+// 🔧 NORMALIZER (critical fix for cross-device bug)
 const normalize = (s?: string | null) =>
   s?.trim().toLowerCase().replace(/\s+/g, " ")
 
@@ -59,10 +59,7 @@ function SkillTestPageContent() {
         }
       }
 
-      setActualSkillName(
-        skillLabel.replace(/\b\w/g, (c) => c.toUpperCase())
-      )
-
+      setActualSkillName(skillLabel.replace(/\b\w/g, c => c.toUpperCase()))
       setLoadingQuestions(true)
       setSkillNotFound(false)
 
@@ -96,9 +93,128 @@ function SkillTestPageContent() {
     loadQuestions()
   }, [skillName])
 
-  // ⚠️ everything else is SAME as your original
+  const handleAnswerSelect = (value: string) => {
+    const newAnswers = [...answers]
+    newAnswers[currentQuestion] = parseInt(value)
+    setAnswers(newAnswers)
+  }
 
-  return <div>{/* rest of your component stays unchanged */}</div>
+  const handleNext = () => currentQuestion < questions.length - 1 && setCurrentQuestion(q => q + 1)
+  const handlePrevious = () => currentQuestion > 0 && setCurrentQuestion(q => q - 1)
+
+  const handleSubmit = async () => {
+    setSubmitError(null)
+
+    if (questions.length < 5) {
+      setSubmitError("A minimum of 5 questions is required.")
+      return
+    }
+
+    if (answers.some(a => a === -1)) {
+      setSubmitError("Please answer all questions.")
+      return
+    }
+
+    setIsSubmitting(true)
+
+    let correct = 0
+    questions.forEach((q, idx) => {
+      const selectedIndex = answers[idx]
+      const correctIndex =
+        typeof (q as any).correctAnswerIndex === "number"
+          ? (q as any).correctAnswerIndex
+          : (q as any).correct
+
+      if (selectedIndex === correctIndex) correct++
+    })
+
+    const percentage = Math.round((correct / questions.length) * 100)
+    setScore(percentage)
+    setIsSubmitting(false)
+
+    if (percentage >= 75) {
+      const newSkill: Skill = {
+        id: `skill_${Date.now()}`,
+        name: actualSkillName,
+        level: "Beginner",
+        category: "Other",
+        testResult: { score: percentage, passed: true, date: new Date().toISOString() },
+      }
+
+      addSkillToTeach(newSkill)
+      sessionStorage.removeItem("pendingSkill")
+      alert("You are eligible to teach this skill!")
+      router.push("/dashboard")
+    } else {
+      setSubmitError("You should pass this test to teach.")
+    }
+  }
+
+  const progress = ((currentQuestion + 1) / questions.length) * 100
+  const canSubmit = answers.every(a => a !== -1) && !isSubmitting
+  const passed = score !== null && score >= 75
+
+  if (loadingQuestions) {
+    return (
+      <div className="min-h-screen p-8 text-center">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+        Loading questions for {actualSkillName}...
+      </div>
+    )
+  }
+
+  if (skillNotFound || questions.length < 5) {
+    return (
+      <div className="min-h-screen p-8 text-center">
+        <p>Skill test for "{actualSkillName}" is coming soon!</p>
+        <Button onClick={() => router.push("/dashboard")}>Back</Button>
+      </div>
+    )
+  }
+
+  if (score !== null) {
+    return (
+      <div className="min-h-screen p-8 text-center">
+        <h1 className="text-4xl font-bold">{score}%</h1>
+        <p>{passed ? "Passed 🎉" : "Failed 😢"}</p>
+        <Button onClick={() => router.push("/dashboard")}>Back</Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen p-8 max-w-2xl mx-auto">
+      <BackButton />
+      <Card>
+        <CardHeader>
+          <CardTitle>AI Skill Test: {actualSkillName}</CardTitle>
+          <CardDescription>Answer all questions. You need 75% to pass.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Progress value={progress} />
+          <h3 className="font-semibold">{questions[currentQuestion].question}</h3>
+
+          <RadioGroup onValueChange={handleAnswerSelect}>
+            {questions[currentQuestion].options.map((opt, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <RadioGroupItem value={idx.toString()} />
+                <Label>{opt}</Label>
+              </div>
+            ))}
+          </RadioGroup>
+
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={handlePrevious} disabled={currentQuestion === 0}>Previous</Button>
+            {currentQuestion < questions.length - 1 ? (
+              <Button onClick={handleNext}>Next</Button>
+            ) : (
+              <Button onClick={handleSubmit} disabled={!canSubmit}>Submit</Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 export default function SkillTestPage() {
