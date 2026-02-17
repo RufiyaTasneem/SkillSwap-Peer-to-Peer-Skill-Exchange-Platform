@@ -144,7 +144,7 @@ function SkillTestPageContent() {
       const newSkill: Skill = {
         id: `skill_${Date.now()}`,
         name: actualSkillName,
-        level: "Beginner",
+        level: pendingSkill?.level || "Beginner",
         category: "Other",
         testResult: {
           score: percentage,
