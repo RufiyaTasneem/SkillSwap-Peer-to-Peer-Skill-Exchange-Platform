@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { BackButton } from "@/components/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { sessions as defaultSessions } from "@/lib/mock-data"
 import { Calendar, Clock, Video, Plus } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { ScheduleSessionDialog } from "@/components/schedule-session-dialog"
@@ -25,7 +24,8 @@ export default function SessionsPage() {
   const [showSchedule, setShowSchedule] = useState(false)
   const [mentorLink, setMentorLink] = useState("")
   const [selectedSkill, setSelectedSkill] = useState("")
-  const [userSessions, setUserSessions] = useState(defaultSessions)
+  const [userSessions, setUserSessions] = useState<any[]>([])
+
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
 
