@@ -6,7 +6,7 @@ import { BackButton } from "@/components/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { sessions as defaultSessions } from "@/lib/mock-data"
-import { Calendar, Clock, MapPin, Video, Plus, CheckCircle2, XCircle, Copy, AlertCircle, Check } from "lucide-react"
+import { Calendar, Clock, Video, Plus } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { ScheduleSessionDialog } from "@/components/schedule-session-dialog"
 import { useAuth } from "@/contexts/auth-context"
@@ -21,18 +21,16 @@ import {
 
 export default function SessionsPage() {
   const { user, updateCredits } = useAuth()
+
   const [showSchedule, setShowSchedule] = useState(false)
-  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null)
   const [mentorLink, setMentorLink] = useState("")
   const [selectedSkill, setSelectedSkill] = useState("")
+  const [userSessions, setUserSessions] = useState(defaultSessions)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
-  const [mentorSessions, setMentorSessions] = useState<Array<{ mentor: string; skill: string; link: string }>>([])
-  const [userSessions, setUserSessions] = useState(defaultSessions)
-  const [completionMessage, setCompletionMessage] = useState<string | null>(null)
-  const [completionError, setCompletionError] = useState<string | null>(null)
+
   const userId = user?.email || "guest"
-  const teachingCreditAward = 25 // simulation credit award per completed session
+  const teachingCreditAward = 25
 
   const upcomingSessions = userSessions.filter((s) => s.status !== "completed")
   const completedSessions = userSessions.filter((s) => s.status === "completed")
@@ -43,95 +41,102 @@ export default function SessionsPage() {
   }, [user?.skillsTeach])
 
   useEffect(() => {
-    const stored = localStorage.getItem("mentorSessions")
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        setMentorSessions(Array.isArray(parsed) ? parsed : [])
-      } catch {
-        setMentorSessions([])
-      }
-    }
-
-    // Load sessions for this user from storage
-    const storedSessions = loadSessionsForUser(userId)
-    setUserSessions(storedSessions)
+    const stored = loadSessionsForUser(userId)
+    setUserSessions(stored)
   }, [userId])
 
+  // ✅ SAVE MENTOR SESSION
   const saveMentorSession = () => {
     setSaveError(null)
     setSaveSuccess(null)
+
     if (!selectedSkill) {
       setSaveError("Choose a skill")
       return
     }
+
     if (!mentorLink.startsWith("https://meet.google.com/")) {
       setSaveError("Meeting link must start with https://meet.google.com/")
       return
     }
-    const mentorName = user?.name || "Mentor"
-    const existing = mentorSessions.filter((m) => !(m.mentor === mentorName && m.skill === selectedSkill))
-    const updated = [...existing, { mentor: mentorName, skill: selectedSkill, link: mentorLink }]
-    setMentorSessions(updated)
-    localStorage.setItem("mentorSessions", JSON.stringify(updated))
-    setSaveSuccess("Meeting link saved")
-    setMentorLink("")
-  }
 
-  const handleJoinSession = (sessionId: string, meetingLink?: string) => {
-    // Move session to in-progress when joining
-    const updated = markSessionInProgress(userId, sessionId)
-    setUserSessions(updated)
-    if (meetingLink) {
-      window.open(meetingLink, "_blank")
+    const now = new Date()
+
+    const newSession = {
+      id: Date.now().toString(),
+      skill: selectedSkill,
+      mentor: user?.name || "Mentor",
+      type: "online",
+      date: now.toISOString(),
+      time: now.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }),
+      meetingLink: mentorLink,
+      status: "scheduled",
     }
+
+    const updated = [...userSessions, newSession]
+    setUserSessions(updated)
+    saveSessionsForUser(userId, updated)
+
+    setMentorLink("")
+    setSelectedSkill("")
+    setSaveSuccess("Session created successfully")
   }
 
-  const handleCompleteSession = (sessionId: string) => {
-    setCompletionMessage(null)
-    setCompletionError(null)
-    try {
-      const { sessions: updated, creditsAwarded } = markSessionCompleted(userId, sessionId, teachingCreditAward)
-      setUserSessions(updated)
-      if (user) {
-        updateCredits((user.credits || 0) + creditsAwarded)
-      }
-      setCompletionMessage("Credits awarded successfully")
-    } catch (err: any) {
-      setCompletionError(err.message || "Could not complete session")
+  const handleJoin = (id: string, link?: string) => {
+    const updated = markSessionInProgress(userId, id)
+    setUserSessions(updated)
+    if (link) window.open(link, "_blank")
+  }
+
+  const handleComplete = (id: string) => {
+    const { sessions: updated, creditsAwarded } =
+      markSessionCompleted(userId, id, teachingCreditAward)
+
+    setUserSessions(updated)
+
+    if (user) {
+      updateCredits((user.credits || 0) + creditsAwarded)
     }
   }
 
   return (
     <div className="p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+
         {/* Header */}
-        <div className="flex items-start justify-between">
+        <div className="flex justify-between items-start">
           <div>
-            <div className="mb-4 flex items-center gap-4">
+            <div className="flex items-center gap-4 mb-4">
               <BackButton />
-              <h1 className="text-3xl font-bold text-balance mb-2">My Sessions</h1>
+              <h1 className="text-3xl font-bold">My Sessions</h1>
             </div>
-            <p className="text-muted-foreground text-pretty">Manage your upcoming and past learning sessions</p>
+            <p className="text-muted-foreground">
+              Manage your upcoming and past learning sessions
+            </p>
           </div>
+
           <Button onClick={() => setShowSchedule(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Schedule Session
           </Button>
         </div>
 
-        {/* Mentor session setup (minimal UI) */}
+        {/* Mentor Setup */}
         {eligibleSkills.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle>Mentor Session</CardTitle>
-              <CardDescription>Share a Google Meet link for a skill you can teach</CardDescription>
+              <CardDescription>Share a Google Meet link</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-3 items-end">
               <div className="space-y-2">
                 <Label>Select Skill</Label>
                 <select
-                  className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+                  className="w-full border rounded-md px-3 py-2 bg-background"
                   value={selectedSkill}
                   onChange={(e) => setSelectedSkill(e.target.value)}
                 >
@@ -143,6 +148,7 @@ export default function SessionsPage() {
                   ))}
                 </select>
               </div>
+
               <div className="space-y-2 md:col-span-2">
                 <Label>Google Meet Link</Label>
                 <Input
@@ -151,310 +157,117 @@ export default function SessionsPage() {
                   onChange={(e) => setMentorLink(e.target.value)}
                 />
               </div>
-              <div className="flex gap-2">
-                <Button onClick={saveMentorSession}>Save Mentor Link</Button>
-                {saveSuccess && <span className="text-sm text-green-600">{saveSuccess}</span>}
-                {saveError && <span className="text-sm text-red-600">{saveError}</span>}
-              </div>
+
+              <Button onClick={saveMentorSession}>
+                Save Mentor Link
+              </Button>
+
+              {saveError && <p className="text-red-500 text-sm">{saveError}</p>}
+              {saveSuccess && <p className="text-green-500 text-sm">{saveSuccess}</p>}
             </CardContent>
           </Card>
         )}
 
-        {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">This Week</p>
-                  <p className="text-2xl font-bold">3</p>
-                  <p className="text-xs text-muted-foreground mt-1">2 teaching, 1 learning</p>
-                </div>
-                <div className="p-3 rounded-lg bg-primary/10">
-                  <Calendar className="h-5 w-5 text-primary" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Total Completed</p>
-                  <p className="text-2xl font-bold">24</p>
-                  <p className="text-xs text-muted-foreground mt-1">+600 credits earned</p>
-                </div>
-                <div className="p-3 rounded-lg bg-accent/10">
-                  <CheckCircle2 className="h-5 w-5 text-accent" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Avg. Rating</p>
-                  <p className="text-2xl font-bold">4.8</p>
-                  <p className="text-xs text-muted-foreground mt-1">From 18 reviews</p>
-                </div>
-                <div className="p-3 rounded-lg bg-amber-400/10">
-                  <span className="text-xl">⭐</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Completion feedback */}
-        {(completionMessage || completionError) && (
-          <Card>
-            <CardContent className="p-4">
-              {completionMessage && <p className="text-sm text-green-600">{completionMessage}</p>}
-              {completionError && <p className="text-sm text-red-600">{completionError}</p>}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Sessions List */}
-        <Tabs defaultValue="upcoming" className="w-full">
+        {/* Tabs */}
+        <Tabs defaultValue="upcoming">
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-            <TabsTrigger value="past">Past Sessions</TabsTrigger>
+            <TabsTrigger value="past">Past</TabsTrigger>
           </TabsList>
 
+          {/* UPCOMING */}
           <TabsContent value="upcoming" className="mt-6 space-y-4">
-            {/* Learner view: mentor sessions list */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Available Mentor Sessions</CardTitle>
-                <CardDescription>Join Google Meet sessions shared by mentors</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {mentorSessions.length === 0 && <p className="text-sm text-muted-foreground">Session not scheduled yet</p>}
-                {mentorSessions.map((m, idx) => (
-                  <div key={`${m.mentor}-${m.skill}-${idx}`} className="flex items-center justify-between border rounded-md p-3">
+            {upcomingSessions.map((session) => (
+              <Card
+                key={session.id}
+                className="bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700"
+              >
+                <CardHeader>
+                  <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-semibold">{m.skill}</p>
-                      <p className="text-sm text-muted-foreground">Mentor: {m.mentor}</p>
+                      <CardTitle className="text-xl">
+                        {session.skill}
+                      </CardTitle>
+                      <CardDescription>
+                        with {session.mentor}
+                      </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="default"
-                        onClick={() => window.open(m.link, "_blank")}
-                      >
-                        Join Meet
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
 
-            {upcomingSessions.length === 0 ? (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                      <Calendar className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold mb-1">No upcoming sessions</h3>
-                      <p className="text-sm text-muted-foreground mb-4">Schedule a session to start learning!</p>
-                      <Button onClick={() => setShowSchedule(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Schedule Session
-                      </Button>
-                    </div>
+                    <Badge
+                      variant="outline"
+                      className="text-green-400 border-green-400"
+                    >
+                      {session.status}
+                    </Badge>
                   </div>
+                </CardHeader>
+
+                <CardContent className="space-y-4">
+
+                  {/* Date */}
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    {new Date(session.date).toLocaleDateString("en-US", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </div>
+
+                  {/* Time */}
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    {session.time}
+                  </div>
+
+                  {/* Meeting Box */}
+                  {session.meetingLink && (
+                    <div className="border border-blue-500 rounded-lg p-4 bg-blue-950/30 space-y-3">
+                      <p className="font-medium text-blue-400">
+                        Google Meet Session
+                      </p>
+
+                      <div className="bg-slate-900 p-3 rounded text-sm break-all">
+                        {session.meetingLink}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1"
+                          onClick={() => handleJoin(session.id, session.meetingLink)}
+                        >
+                          <Video className="h-4 w-4 mr-2" />
+                          Join Google Meet Now
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => handleComplete(session.id)}
+                        >
+                          Mark Session as Completed
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            ) : (
-              upcomingSessions.map((session) => (
-                <Card key={session.id}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <CardTitle className="text-xl">{session.skill}</CardTitle>
-                          <Badge variant={session.type === "online" ? "default" : "secondary"}>
-                            {session.type === "online" ? (
-                              <>
-                                <Video className="h-3 w-3 mr-1" />
-                                Online
-                              </>
-                            ) : (
-                              <>
-                                <MapPin className="h-3 w-3 mr-1" />
-                                In-Person
-                              </>
-                            )}
-                          </Badge>
-                        </div>
-                        <CardDescription>
-                          with {session.mentor === "Rufiya" ? session.mentee : session.mentor}
-                        </CardDescription>
-                      </div>
-                      <Badge variant="outline" className="bg-accent/10 text-accent border-accent/20 capitalize">
-                        {session.status || "scheduled"}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span>
-                          {new Date(session.date).toLocaleDateString("en-US", {
-                            weekday: "long",
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <span>{session.time}</span>
-                      </div>
-                      {session.location && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <MapPin className="h-4 w-4 text-muted-foreground" />
-                          <span>{session.location}</span>
-                        </div>
-                      )}
-                      {session.type === "online" && session.meetingLink && (
-                        <div className="space-y-3 p-4 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-2 border-blue-200 dark:border-blue-800">
-                          <div className="flex items-center gap-2">
-                            <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/50">
-                              <Video className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100">
-                                Google Meet Session
-                              </h4>
-                              <p className="text-xs text-blue-700 dark:text-blue-300">
-                                Click the button below to join the meeting
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 p-2 rounded-md bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs text-muted-foreground mb-1">Meeting Link:</p>
-                              <p className="text-sm font-mono text-blue-600 dark:text-blue-400 truncate">
-                                {session.meetingLink}
-                              </p>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="shrink-0"
-                              onClick={() => {
-                                navigator.clipboard.writeText(session.meetingLink || "")
-                                setCopiedLinkId(session.id)
-                                setTimeout(() => setCopiedLinkId(null), 2000)
-                              }}
-                            >
-                              {copiedLinkId === session.id ? (
-                                <Check className="h-4 w-4 text-green-500" />
-                              ) : (
-                                <Copy className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </div>
-                          <div className="flex flex-col md:flex-row gap-2">
-                            <Button
-                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-6 text-base"
-                              onClick={() => handleJoinSession(session.id, session.meetingLink)}
-                              size="lg"
-                            >
-                              <Video className="h-5 w-5 mr-2" />
-                              {session.status === "in-progress" ? "Rejoin Meeting" : "Join Google Meet Now"}
-                            </Button>
-                            <Button
-                              className="flex-1"
-                              variant="outline"
-                              disabled={session.status === "completed"}
-                              onClick={() => handleCompleteSession(session.id)}
-                            >
-                              {session.status === "completed" ? "Session Completed" : "Mark Session as Completed"}
-                            </Button>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Simulation: completion awards teaching credits without a learner confirmation.
-                          </p>
-                        </div>
-                      )}
-                      {session.type === "online" && !session.meetingLink && (
-                        <div className="p-4 rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800">
-                          <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-300">
-                            <AlertCircle className="h-4 w-4" />
-                            <p className="text-sm">Meeting link will be shared soon</p>
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex gap-2 pt-2">
-                        <Button variant="outline" className="flex-1 bg-transparent">
-                          View Details
-                        </Button>
-                        <Button variant="outline" size="icon">
-                          <XCircle className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
+            ))}
           </TabsContent>
 
+          {/* PAST */}
           <TabsContent value="past" className="mt-6 space-y-4">
-            {completedSessions.length === 0 ? (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                      <CheckCircle2 className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold mb-1">No completed sessions yet</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Your session history will appear here after you complete your first session
-                      </p>
-                    </div>
-                  </div>
+            {completedSessions.map((session) => (
+              <Card key={session.id}>
+                <CardContent className="p-6">
+                  <h3 className="font-semibold">{session.skill}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(session.date).toLocaleDateString()} at {session.time}
+                  </p>
                 </CardContent>
               </Card>
-            ) : (
-              <div className="space-y-4">
-                {completedSessions.map((session) => (
-                  <Card key={session.id}>
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-semibold mb-1">{session.skill}</h3>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            with {session.mentor === "Rufiya" ? session.mentee : session.mentor}
-                          </p>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span>{new Date(session.date).toLocaleDateString()}</span>
-                            <span>{session.time}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {session.type}
-                            </Badge>
-                          </div>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          Rate Session
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+            ))}
           </TabsContent>
         </Tabs>
       </div>
