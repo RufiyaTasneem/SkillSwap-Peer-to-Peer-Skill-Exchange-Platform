@@ -259,30 +259,7 @@ export const communityPosts: Post[] = [
 ]
 
 // Sessions
-export const sessions: Session[] = [
-  {
-    id: "ses1",
-    skill: "Machine Learning Basics",
-    type: "online",
-    date: "2024-12-20",
-    time: "14:00",
-    meetingLink: "https://meet.example.com/ml-basics",
-    mentor: "Sarah Johnson",
-    mentee: "Rufiya",
-    status: "scheduled",
-  },
-  {
-    id: "ses2",
-    skill: "React Development",
-    type: "offline",
-    date: "2024-12-18",
-    time: "16:30",
-    location: "Campus Library, Room 204",
-    mentor: "Rufiya",
-    mentee: "John Doe",
-    status: "scheduled",
-  },
-]
+export const sessions: Session[] = []
 
 // All available skills for autocomplete
 export const allSkills = [
